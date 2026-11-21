@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Download } from 'lucide-react'
 import { api } from '../../lib/api'
 import { useApi } from '../../lib/useApi'
-import { dateTime, titleCase } from '../../lib/format'
+import { dateTime, saveTextFile, titleCase } from '../../lib/format'
 import { Badge, ErrorBox, Loading, PageHeader, Table } from '../../components/ui'
 
 const FILTERS = ['', 'auth.', 'company.', 'user.', 'location.', 'audit.', 'demo.']
@@ -14,9 +14,7 @@ export default function AuditPage() {
 
   const exportCsv = async () => {
     const csv = await api<string>(`/audit-logs/export${action ? `?action=${encodeURIComponent(action)}` : ''}`)
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    Object.assign(document.createElement('a'), { href: url, download: 'audit-log.csv' }).click()
-    URL.revokeObjectURL(url)
+    await saveTextFile('audit-log.csv', csv)
   }
 
   return (

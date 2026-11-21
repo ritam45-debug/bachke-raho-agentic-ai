@@ -21,6 +21,13 @@ npm install
 npm run dev                         # http://localhost:5173  → "Open demo workspace"
 ```
 
+## Browser preview (claude.ai)
+
+`npm run build:preview` (in `frontend/`) builds one self-contained HTML file. In it, a TypeScript port of the API
+(`src/preview/backend.ts`) runs inside the page against the same demo data, so the whole app works with no server.
+Data is stored only in the viewer's browser, so this is a product demo, **not** the secure deployment.
+Regenerate its data with `python scripts/build_preview_data.py` after changing `sample_data/`.
+
 ## Full stack with PostgreSQL + RLS
 
 ```bash

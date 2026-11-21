@@ -89,7 +89,7 @@ export default function AppLayout() {
             <div className="truncate text-xs text-slate-500 dark:text-slate-400">{me?.full_name} · {titleCase(me?.role ?? '')}</div>
           </div>
           <ThemeToggle />
-          <button onClick={async () => { await logout(); nav('/') }} className="btn-ghost !px-3" title="Sign out"><LogOut size={16} /><span className="hidden sm:inline">Sign out</span></button>
+          <button onClick={() => { nav('/'); void logout() }} className="btn-ghost !px-3" title="Sign out"><LogOut size={16} /><span className="hidden sm:inline">Sign out</span></button>
         </header>
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           {me?.is_demo && <div className="mb-4"><SimulatedBanner /></div>}

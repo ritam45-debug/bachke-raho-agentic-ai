@@ -1,6 +1,11 @@
 // Thin API client. Access token lives in memory only; the rotating refresh token is kept in
 // sessionStorage so a reload keeps you signed in for this tab. (Phase 7 moves it to an httpOnly cookie.)
+import { previewFetch } from '../preview/backend'
+
 const BASE = (import.meta.env.VITE_API_BASE ?? '') + '/api/v1'
+export const PREVIEW = import.meta.env.VITE_PREVIEW === '1'
+// In the claude.ai preview build, requests go to an in-browser port of the API instead of the network.
+const doFetch: typeof fetch = PREVIEW ? ((i, init) => previewFetch(String(i), init)) : ((i, init) => fetch(i, init))
 const RT_KEY = 'bra.rt'
 
 let accessToken: string | null = null
@@ -33,7 +38,7 @@ async function tryRefresh(): Promise<boolean> {
   try { rt = sessionStorage.getItem(RT_KEY) } catch { /* ignore */ }
   if (!rt) return false
   refreshing ??= (async () => {
-    const r = await fetch(`${BASE}/auth/refresh`, {
+    const r = await doFetch(`${BASE}/auth/refresh`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }),
     })
     if (!r.ok) { setTokens(null); return false }
@@ -54,7 +59,7 @@ export async function api<T>(path: string, opts: RequestInit & { json?: unknown 
   const headers: Record<string, string> = { ...(opts.headers as Record<string, string>) }
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`
   if (opts.json !== undefined) headers['Content-Type'] = 'application/json'
-  const r = await fetch(`${BASE}${path}`, { ...opts, headers, body: opts.json !== undefined ? JSON.stringify(opts.json) : opts.body })
+  const r = await doFetch(`${BASE}${path}`, { ...opts, headers, body: opts.json !== undefined ? JSON.stringify(opts.json) : opts.body })
   if (r.status === 401 && retry && !path.startsWith('/auth/login') && (await tryRefresh())) {
     return api<T>(path, opts, false)
   }

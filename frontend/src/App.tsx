@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { PREVIEW } from './lib/api'
+import PreviewRibbon from './preview/PreviewRibbon'
 import { AuthProvider, useAuth } from './lib/auth'
 import AppLayout from './components/AppLayout'
 import { Loading, PageHeader, PhasePanel } from './components/ui'
@@ -26,10 +28,14 @@ const PLANNED: { path: string; title: string; phase: number; items: string[] }[]
   { path: 'consulting', title: 'AI Consulting Centre', phase: 2, items: ['Claude-powered conversational assistant', 'Central orchestrator with stateful agent workflows', 'Explained recommendations and strategy comparison', 'Agent execution logs'] },
 ]
 
+// The artifact frame only passes plain #names, so the preview keeps routes in memory.
+const Router = PREVIEW ? MemoryRouter : BrowserRouter
+
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <Router>
+        {PREVIEW && <PreviewRibbon />}
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
@@ -49,7 +55,7 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
     </AuthProvider>
   )
 }

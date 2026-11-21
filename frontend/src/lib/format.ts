@@ -17,6 +17,20 @@ export const dateTime = (v: string | null | undefined) =>
 
 export const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
+type Downloads = { save: (r: { filename: string; data: string }) => Promise<unknown> }
+declare global { interface Window { claude?: { use: (n: string) => Promise<unknown> } } }
+
+/** Save a text file. Inside a claude.ai artifact, plain downloads are blocked, so use its `downloads` capability. */
+export async function saveTextFile(filename: string, text: string) {
+  if (window.claude?.use) {
+    const d = (await window.claude.use('downloads').catch(() => null)) as Downloads | null
+    if (d) { await d.save({ filename, data: text }).catch(() => undefined); return }
+  }
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }))
+  Object.assign(document.createElement('a'), { href: url, download: filename }).click()
+  URL.revokeObjectURL(url)
+}
+
 export function useCsvDownload() {
   return (filename: string, rows: Record<string, unknown>[]) => {
     if (!rows.length) return
@@ -26,9 +40,6 @@ export function useCsvDownload() {
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
     const csv = [cols.join(','), ...rows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    const a = Object.assign(document.createElement('a'), { href: url, download: filename })
-    a.click()
-    URL.revokeObjectURL(url)
+    void saveTextFile(filename, csv)
   }
 }

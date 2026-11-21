@@ -20,7 +20,7 @@ const PILLARS = [
 ]
 
 export default function Landing() {
-  const { demo } = useAuth()
+  const { demo, me } = useAuth()
   const nav = useNavigate()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -36,8 +36,14 @@ export default function Landing() {
         <Logo />
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Link to="/login" className="btn-ghost">Company login</Link>
-          <Link to="/register" className="btn-primary hidden sm:inline-flex">Register company</Link>
+          {me ? (
+            <Link to="/app" className="btn-primary">Open your workspace <ArrowRight size={16} /></Link>
+          ) : (
+            <>
+              <Link to="/login" className="btn-ghost">Company login</Link>
+              <Link to="/register" className="btn-primary hidden sm:inline-flex">Register company</Link>
+            </>
+          )}
         </div>
       </header>
 
