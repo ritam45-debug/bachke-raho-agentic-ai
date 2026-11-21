@@ -1,0 +1,5 @@
+title,category,severity,status,affected_countries,affected_supplier_codes,summary,detected_offset_days,resolved_offset_days
+Fire halts a fab line at NovaChip Semiconductor,supplier_incident,78,active,Taiwan,SUP-001,SIMULATED: A fire at the supplier's Hsinchu facility has stopped one of two production lines. Supplier estimates 4–6 weeks to restore output. NovaChip supplies ~65% of Aureon's MCU volume.,-1,
+Congestion at South China container ports,port_congestion,55,monitoring,China,SUP-002,SIMULATED: Vessel waiting times at Yantian have risen to 3–4 days after a weather closure.,-6,
+Cyclone closes Chennai port for 3 days,natural_disaster,62,resolved,India,SUP-009,SIMULATED historical event: inbound copper and cell deliveries slipped by 4–6 days.,-210,-203
+Hanoi FlexCircuit repeated late deliveries,supplier_performance,40,resolved,Vietnam,SUP-007,SIMULATED historical record: three consecutive PCB lots arrived 5+ days late during Q2.,-150,-95

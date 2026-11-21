@@ -1,0 +1,24 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --color-ink-950: #060f1e;
+  --color-ink-900: #0b1b33;
+  --color-ink-800: #122745;
+  --color-ink-700: #1c375c;
+  --color-signal: #f5a524;
+  --color-signal-soft: #fde7bd;
+  --color-calm: #2dd4bf;
+}
+
+html, body, #root { height: 100%; }
+body { @apply bg-slate-50 text-slate-900 dark:bg-ink-950 dark:text-slate-100 antialiased; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.card { @apply rounded-xl border border-slate-200 bg-white dark:border-ink-700 dark:bg-ink-900; }
+.input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-signal focus:ring-2 focus:ring-signal/30 dark:border-ink-700 dark:bg-ink-950; }
+.label { @apply mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400; }
+.btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed bg-signal text-ink-950 hover:brightness-110; }
+.btn-ghost { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed border border-slate-300 hover:bg-slate-100 dark:border-ink-700 dark:hover:bg-ink-800; }
