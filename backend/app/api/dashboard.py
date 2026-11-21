@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.analytics.inventory_metrics import stock_status
 from app.database.session import get_db
-from app.models import CompanyProfile, Disruption, InventoryItem, Location, Product, Shipment, Supplier
+from app.models import CompanyProfile, Disruption, InventoryItem, Location, Product, Route, RouteRiskCheck, Shipment, Supplier
 from app.security.deps import TenantContext, require
 from app.security.rbac import Perm
 from app.services.tenant_repo import scoped
@@ -44,9 +44,14 @@ def overview(ctx: TenantContext = Depends(require(Perm.OPS_READ)), db: Session =
     active_disr = [d for d in disr if d.status != "resolved"]
     flagged = [s for s in sups if (s.on_time_delivery_rate or 1) < LOW_OTD or (s.quality_score or 100) < LOW_QUALITY]
     has_sim = any(x.data_source == "simulated" for x in [*inv, *ships, *sups])
+    routes = list(db.scalars(scoped(Route, ctx)))
+    latest: dict[str, RouteRiskCheck] = {}
+    for c in db.scalars(scoped(RouteRiskCheck, ctx).order_by(RouteRiskCheck.checked_at)):
+        latest[c.route_id] = c
+    loc_list = list(locs.values())
 
     return {
-        "data_mode": "simulated" if (ctx.company and ctx.company.is_demo) or has_sim else "company_data",
+        "data_mode": "simulated" if has_sim else "company_data",
         "currency": (db.scalar(scoped(CompanyProfile, ctx)).currency if db.scalar(scoped(CompanyProfile, ctx)) else "INR"),
         "kpis": {
             "inventory_value": round(total_value, 2),
@@ -60,7 +65,19 @@ def overview(ctx: TenantContext = Depends(require(Perm.OPS_READ)), db: Session =
             "max_active_severity": max((d.severity for d in active_disr), default=0),
             "suppliers": len(sups),
             "flagged_suppliers": len(flagged),
+            "locations": len(loc_list),
+            "locations_mapped": sum(1 for x in loc_list if x.latitude is not None and x.longitude is not None),
+            "routes": len(routes),
+            "routes_checked": sum(1 for r in routes if r.id in latest),
+            "routes_elevated_or_high": sum(1 for r in routes if r.id in latest and latest[r.id].score >= 50),
+            "max_route_score": max((latest[r.id].score for r in routes if r.id in latest), default=0),
+            "last_route_check_at": max((latest[r.id].checked_at for r in routes if r.id in latest), default=None),
         },
+        "route_risks": sorted([
+            {"id": r.id, "name": r.name, "mode": r.mode, "score": latest[r.id].score, "band": latest[r.id].band,
+             "checked_at": latest[r.id].checked_at,
+             "top_factor": max(latest[r.id].factors, key=lambda f: f.get("points", 0))["detail"] if latest[r.id].factors else None}
+            for r in routes if r.id in latest], key=lambda x: -x["score"])[:8],
         "charts": {
             "inventory_status": [{"status": k, "count": status_counts.get(k, 0)}
                                  for k in ["stockout", "critical", "reorder", "healthy", "excess"]],

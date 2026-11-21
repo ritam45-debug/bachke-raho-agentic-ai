@@ -1,18 +1,16 @@
 // In-browser port of the FastAPI backend, used ONLY by the claude.ai preview build (VITE_PREVIEW=1).
 // It mirrors the real API's routes, validation and rules so the same React app runs unchanged,
 // but it is NOT a security boundary: everything lives in this viewer's browser storage.
-import demo from './demoData.json'
-
 type Rec = Record<string, unknown>
 interface Company { id: string; name: string; slug: string; industry: string; company_size: string; headquarters: string; country: string | null; registration_number: string | null; status: string; is_demo: boolean; ai_external_processing: boolean; data_retention_days: number; created_at: string }
 interface Profile { company_id: string; description: string | null; product_categories: string[]; admin_contact_name: string | null; admin_contact_email: string | null; admin_contact_phone: string | null; website: string | null; currency: string }
-interface Loc { id: string; company_id: string; name: string; kind: string; city: string | null; country: string | null }
+interface Loc { id: string; company_id: string; name: string; kind: string; city: string | null; country: string | null; latitude: number | null; longitude: number | null }
 interface User { id: string; company_id: string; email: string; full_name: string; job_title: string | null; role: string; pw: string; salt: string; is_active: boolean; failed: number; locked_until: number | null; last_login_at: string | null; created_at: string }
 interface Session { id: string; user_id: string; access: string; refresh: string; access_exp: number; refresh_exp: number; revoked: boolean }
 interface Audit { id: string; company_id: string | null; actor_user_id: string | null; actor_type: string; action: string; entity_type: string | null; entity_id: string | null; outcome: string; ip_address: string | null; details: Rec; created_at: string }
-interface State { v: 1; companies: Company[]; profiles: Profile[]; locations: Loc[]; users: User[]; sessions: Session[]; audit: Audit[]; ops: Record<string, Rec[]> }
+interface State { v: 2; companies: Company[]; profiles: Profile[]; locations: Loc[]; users: User[]; sessions: Session[]; audit: Audit[]; ops: Record<string, Rec[]>; routes: Rec[]; checks: Rec[] }
 
-const KEY = 'bra.preview.state.v1'
+const KEY = 'bra.preview.state.v2' // v1 held the removed Aureon demo
 const ACCESS_MS = 30 * 60e3, REFRESH_MS = 7 * 864e5, MAX_FAIL = 5, LOCK_MS = 15 * 60e3
 const ROLES = ['company_admin', 'supply_chain_manager', 'procurement_manager', 'finance_manager', 'analyst', 'read_only']
 const ALL = ['company:read', 'company:update', 'users:read', 'users:manage', 'ops:read', 'ops:write', 'procurement:write', 'finance:read', 'audit:read', 'approvals:high_impact']
@@ -24,7 +22,6 @@ const PERMS: Record<string, string[]> = {
   analyst: ['company:read', 'ops:read', 'finance:read'],
   read_only: ['company:read', 'ops:read'],
 }
-const DEMO_EMAIL = 'demo.analyst@aureon-demo.invalid'
 
 const uid = () => crypto.randomUUID()
 const rand = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('')
@@ -43,23 +40,8 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(S)) } catch { /
 function load(): State | null { try { const r = localStorage.getItem(KEY); return r ? JSON.parse(r) : null } catch { return null } }
 
 function seed(): State {
-  const t0 = Date.now(), day = (o: string) => new Date(t0 + Number(o) * 864e5).toISOString()
-  const cid = uid()
-  const st: State = { v: 1, companies: [], profiles: [], locations: [], users: [], sessions: [], audit: [], ops: { suppliers: [], products: [], inventory: [], shipments: [], disruptions: [] } }
-  st.companies.push({ id: cid, name: 'Aureon Electronics Pvt. Ltd. (Demo)', slug: 'aureon-electronics-demo', industry: 'Electronics manufacturing', company_size: '1001-5000', headquarters: 'Pune, India', country: 'India', registration_number: 'SIMULATED-U00000MH2015PTC000000', status: 'active', is_demo: true, ai_external_processing: false, data_retention_days: 730, created_at: nowIso() })
-  st.profiles.push({ company_id: cid, currency: 'INR', website: null, description: 'SIMULATED demo company. Consumer and industrial electronics maker with three plants, three warehouses and a distribution centre in India.', product_categories: ['Energy devices', 'Portable power', 'Audio', 'Smart home', 'EV infrastructure'], admin_contact_name: 'Demo Administrator', admin_contact_email: 'demo.admin@aureon-demo.invalid', admin_contact_phone: null })
-  const D = demo as Record<string, Record<string, string>[]>
-  const locs: Record<string, string> = {}, sups: Record<string, string> = {}, prods: Record<string, string> = {}
-  for (const r of D.locations) { const id = uid(); locs[r.name] = id; st.locations.push({ id, company_id: cid, name: r.name, kind: r.kind, city: r.city, country: r.country }) }
-  for (const r of D.suppliers) { const id = uid(); sups[r.code] = id; st.ops.suppliers.push({ id, company_id: cid, code: r.code, name: r.name, category: r.category, country: r.country, city: r.city, on_time_delivery_rate: +r.on_time_delivery_rate, quality_score: +r.quality_score, avg_lead_time_days: +r.avg_lead_time_days, annual_spend: +r.annual_spend, is_active: true, data_source: 'simulated' }) }
-  for (const r of D.products) { const id = uid(); prods[r.sku] = id; st.ops.products.push({ id, company_id: cid, sku: r.sku, name: r.name, kind: r.kind, category: r.category, unit: r.unit, unit_cost: +r.unit_cost, unit_price: r.unit_price ? +r.unit_price : null, primary_supplier_id: r.primary_supplier_code ? sups[r.primary_supplier_code] : null, data_source: 'simulated' }) }
-  for (const r of D.inventory) st.ops.inventory.push({ id: uid(), company_id: cid, product_id: prods[r.sku], location_id: locs[r.location], quantity_on_hand: +r.quantity_on_hand, reorder_point: +r.reorder_point, safety_stock: +r.safety_stock, avg_daily_demand: +r.avg_daily_demand, lead_time_days: +r.lead_time_days, data_source: 'simulated' })
-  for (const r of D.shipments) st.ops.shipments.push({ id: uid(), company_id: cid, reference: r.reference, direction: r.direction, supplier_id: r.supplier_code ? sups[r.supplier_code] : null, product_id: prods[r.sku], quantity: +r.quantity, value: +r.value, origin: r.origin, origin_country: r.origin_country, destination: r.destination, mode: r.mode, carrier: r.carrier, status: r.status, departed_at: +r.departed_offset_days <= 0 ? day(r.departed_offset_days) : null, original_eta: day(r.original_eta_offset_days), current_eta: day(r.current_eta_offset_days), data_source: 'simulated' })
-  for (const r of D.disruptions) st.ops.disruptions.push({ id: uid(), company_id: cid, title: r.title, category: r.category, severity: +r.severity, status: r.status, verification: 'simulated', affected_countries: r.affected_countries.split(';').filter(Boolean), affected_supplier_ids: r.affected_supplier_codes.split(';').filter(Boolean).map((c) => sups[c]), summary: r.summary, source_name: 'Simulation engine (demo data)', source_url: null, detected_at: day(r.detected_offset_days), resolved_at: r.resolved_offset_days ? day(r.resolved_offset_days) : null })
-  for (const [email, name, role] of [[DEMO_EMAIL, 'Demo Analyst', 'analyst'], ['demo.admin@aureon-demo.invalid', 'Demo Administrator', 'company_admin']])
-    st.users.push({ id: uid(), company_id: cid, email, full_name: name, job_title: 'Simulated user', role, pw: rand(), salt: rand(), is_active: true, failed: 0, locked_until: null, last_login_at: null, created_at: nowIso() })
-  st.audit.push(mkAudit({ action: 'demo.seeded', company_id: cid, actor_type: 'system', entity_type: 'company', entity_id: cid }))
-  return st
+  try { localStorage.removeItem('bra.preview.state.v1') } catch { /* ignore */ }
+  return { v: 2, companies: [], profiles: [], locations: [], users: [], sessions: [], audit: [], ops: { suppliers: [], products: [], inventory: [], shipments: [], disruptions: [] }, routes: [], checks: [] }
 }
 
 function mkAudit(a: Partial<Audit> & { action: string; company_id: string | null }): Audit {
@@ -101,6 +83,44 @@ const noDemo = (ctx: Ctx) => { if (ctx.company?.is_demo) err(403, 'The demo work
 const mine = <T extends { company_id: string | null }>(arr: T[], ctx: Ctx) => arr.filter((x) => x.company_id === ctx.user.company_id)
 const revokeAll = (userId: string) => S.sessions.forEach((s) => { if (s.user_id === userId) s.revoked = true })
 
+// ---------- locations & routes (mirror backend/app/api/company.py and routes_api.py) ----------
+const KINDS = ['headquarters', 'manufacturing', 'warehouse', 'distribution']
+function coord(v: unknown, field: string, lim: number): number | null {
+  if (v == null || v === '') return null
+  const n = Number(v); if (!Number.isFinite(n) || Math.abs(n) > lim) v422(field, `Must be between -${lim} and ${lim}`)
+  return n
+}
+function locFrom(b: Rec, companyId: string): Loc {
+  const name = str(b, 'name', 2, 160)!
+  if (!KINDS.includes(b.kind as string)) v422('kind', 'Invalid location kind')
+  return { id: uid(), company_id: companyId, name, kind: b.kind as string, city: (b.city as string) || null, country: (b.country as string) || null,
+    latitude: coord(b.latitude, 'latitude', 90), longitude: coord(b.longitude, 'longitude', 180) }
+}
+const bandOf = (s: number) => (s >= 75 ? 'high' : s >= 50 ? 'elevated' : s >= 25 ? 'moderate' : 'low')
+function ownRoute(ctx: Ctx, id: string): Rec { const r = (S.routes as Rec[]).find((x) => x.id === id && x.company_id === ctx.user.company_id); if (!r) err(404, 'Route not found'); return r! }
+function routeEnd(ctx: Ctx, b: Rec, side: string): Rec {
+  const id = b[`${side}_location_id`] as string | undefined, Side = side[0].toUpperCase() + side.slice(1)
+  if (id) {
+    const l = mine(S.locations, ctx).find((x) => x.id === id)
+    if (!l) err(404, `${Side} location not found`)
+    if (l!.latitude == null || l!.longitude == null) err(422, `${Side} location '${l!.name}' has no map coordinates yet`)
+    return { [`${side}_location_id`]: l!.id, [`${side}_label`]: l!.name, [`${side}_lat`]: l!.latitude, [`${side}_lon`]: l!.longitude }
+  }
+  const label = b[`${side}_label`], lat = coord(b[`${side}_lat`], `${side}_lat`, 90), lon = coord(b[`${side}_lon`], `${side}_lon`, 180)
+  if (!label || lat == null || lon == null) err(422, `${Side}: choose a saved location or give a label with latitude and longitude`)
+  return { [`${side}_location_id`]: null, [`${side}_label`]: label, [`${side}_lat`]: lat, [`${side}_lon`]: lon }
+}
+function buildRoute(ctx: Ctx, b: Rec): Rec {
+  const name = str(b, 'name', 2, 160)!
+  if (!['sea', 'air', 'road', 'rail'].includes(b.mode as string)) v422('mode', 'Mode must be sea, air, road or rail')
+  return { id: uid(), company_id: ctx.company!.id, name, mode: b.mode, notes: (b.notes as string) || null, created_by: ctx.user.id, created_at: nowIso(),
+    ...routeEnd(ctx, b, 'origin'), ...routeEnd(ctx, b, 'destination') }
+}
+function latestCheck(routeId: unknown): Rec | null {
+  return (S.checks as Rec[]).filter((c) => c.route_id === routeId).sort((a, b) => String(b.checked_at).localeCompare(String(a.checked_at)))[0] ?? null
+}
+const routeOut = (r: Rec) => ({ ...r, latest_check: latestCheck(r.id) })
+
 // ---------- analytics (mirrors backend/app/analytics/inventory_metrics.py) ----------
 const cover = (q: number, d: number) => (d > 0 ? q / d : null)
 function stockStatus(q: number, rop: number, ss: number, d: number, lt: number) {
@@ -115,7 +135,7 @@ const ORDER = ['stockout', 'critical', 'reorder', 'healthy', 'excess']
 
 function companyOut(ctx: Ctx) {
   const c = ctx.company!, p = S.profiles.find((x) => x.company_id === c.id)!
-  const locations = mine(S.locations, ctx).sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name)).map(({ id, name, kind, city, country }) => ({ id, name, kind, city, country }))
+  const locations = mine(S.locations, ctx).sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name)).map(({ id, name, kind, city, country, latitude, longitude }) => ({ id, name, kind, city, country, latitude, longitude }))
   const { company_id: _omit, ...profile } = p; void _omit
   return { ...c, ...profile, locations }
 }
@@ -140,7 +160,9 @@ function overview(ctx: Ctx) {
   const active = dis.filter((d) => d.status !== 'resolved').sort((a, b) => (b.severity as number) - (a.severity as number))
   const flagged = sups.filter((s) => ((s.on_time_delivery_rate as number) ?? 1) < 0.85 || ((s.quality_score as number) ?? 100) < 80)
   const profile = S.profiles.find((p) => p.company_id === ctx.user.company_id)
-  const sim = ctx.company?.is_demo || [...inv, ...ships, ...sups].some((x) => (x as Rec).data_source === 'simulated')
+  const sim = [...inv, ...ships, ...sups].some((x) => (x as Rec).data_source === 'simulated')
+  const routes = mine(S.routes as never[], ctx) as Rec[], locsAll = mine(S.locations, ctx)
+  const withCheck = routes.map((r) => ({ r, c: latestCheck(r.id) })).filter((x) => x.c) as { r: Rec; c: Rec }[]
   return {
     data_mode: sim ? 'simulated' : 'company_data', currency: profile?.currency ?? 'INR',
     kpis: {
@@ -149,6 +171,10 @@ function overview(ctx: Ctx) {
       open_shipments: ships.filter((s) => ['planned', 'in_transit', 'delayed'].includes(s.status as string)).length, delayed_shipments: count(ships, 'status', 'delayed'),
       delayed_shipment_value: ships.filter((s) => s.status === 'delayed').reduce((a, s) => a + (s.value as number), 0),
       active_disruptions: active.length, max_active_severity: active.length ? (active[0].severity as number) : 0, suppliers: sups.length, flagged_suppliers: flagged.length,
+      locations: locsAll.length, locations_mapped: locsAll.filter((l) => l.latitude != null && l.longitude != null).length, routes: routes.length,
+      routes_checked: withCheck.length, routes_elevated_or_high: withCheck.filter((x) => (x.c.score as number) >= 50).length,
+      max_route_score: withCheck.reduce((m, x) => Math.max(m, x.c.score as number), 0),
+      last_route_check_at: withCheck.reduce<string | null>((m, x) => (!m || String(x.c.checked_at) > m ? String(x.c.checked_at) : m), null),
     },
     charts: {
       inventory_status: ORDER.map((status) => ({ status, count: count(inv as Rec[], 'status', status) })),
@@ -156,6 +182,10 @@ function overview(ctx: Ctx) {
       shipment_status: ['planned', 'in_transit', 'delayed', 'delivered', 'cancelled'].map((status) => ({ status, count: count(ships, 'status', status) })),
       supplier_performance: sups.map((s) => ({ supplier: s.name, country: s.country, on_time_pct: Math.round((s.on_time_delivery_rate as number) * 1000) / 10, quality: s.quality_score })).sort((a, b) => a.on_time_pct - b.on_time_pct),
     },
+    route_risks: withCheck.sort((a, b) => (b.c.score as number) - (a.c.score as number)).slice(0, 8).map(({ r, c }) => {
+      const f = ((c.factors as Rec[]) ?? []).reduce<Rec | null>((m, x) => (!m || Number(x.points) > Number(m.points) ? x : m), null)
+      return { id: r.id, name: r.name, mode: r.mode, score: c.score, band: c.band, checked_at: c.checked_at, top_factor: f ? f.detail : null }
+    }),
     active_disruptions: active.map((d) => ({ id: d.id, title: d.title, severity: d.severity, verification: d.verification, category: d.category, affected_countries: d.affected_countries })),
     rules: { flagged_supplier: 'on-time delivery < 85% or quality < 80', severity_note: 'Severity is a rule-based 0–100 score, not a statistical probability.' },
   }
@@ -184,8 +214,8 @@ async function route(method: string, path: string, q: URLSearchParams, body: Rec
     const c: Company = { id: uid(), name, slug, industry, company_size: body.company_size as string, headquarters: hq, country: (body.country as string) || null, registration_number: (body.registration_number as string) || null, status: 'active', is_demo: false, ai_external_processing: false, data_retention_days: 730, created_at: nowIso() }
     S.companies.push(c)
     S.profiles.push({ company_id: c.id, description: null, product_categories: ((body.product_categories as string[]) ?? []).map((x) => x.trim()).filter(Boolean), admin_contact_name: full, admin_contact_email: em, admin_contact_phone: (body.admin_phone as string) || null, website: null, currency: 'INR' })
-    S.locations.push({ id: uid(), company_id: c.id, name: `${name} HQ`, kind: 'headquarters', city: hq, country: c.country })
-    for (const l of (body.locations as Rec[]) ?? []) S.locations.push({ id: uid(), company_id: c.id, name: String(l.name), kind: String(l.kind), city: (l.city as string) || null, country: (l.country as string) || null })
+    S.locations.push({ id: uid(), company_id: c.id, name: `${name} HQ`, kind: 'headquarters', city: hq, country: c.country, latitude: null, longitude: null })
+    for (const l of (body.locations as Rec[]) ?? []) S.locations.push(locFrom(l, c.id))
     const salt = rand()
     const u: User = { id: uid(), company_id: c.id, email: em, full_name: full, job_title: (body.admin_job_title as string) || null, role: 'company_admin', pw: await hash(pw, salt), salt, is_active: true, failed: 0, locked_until: null, last_login_at: nowIso(), created_at: nowIso() }
     S.users.push(u)
@@ -217,13 +247,6 @@ async function route(method: string, path: string, q: URLSearchParams, body: Rec
     sess.revoked = true
     return [200, issue(u!)]
   }
-  if (M('POST', '/auth/demo')) {
-    const u = S.users.find((x) => x.email === DEMO_EMAIL)!
-    u.last_login_at = nowIso()
-    audit({ action: 'auth.demo_login', company_id: u.company_id, actor_user_id: u.id })
-    return [200, issue(u)]
-  }
-
   const ctx = authCtx(token)
   if (M('POST', '/auth/logout')) { ctx.session.revoked = true; audit({ action: 'auth.logout', company_id: ctx.user.company_id, actor_user_id: ctx.user.id }); return [204, null] }
   if (M('GET', '/auth/me')) {
@@ -245,12 +268,27 @@ async function route(method: string, path: string, q: URLSearchParams, body: Rec
   }
   if (M('POST', '/company/locations')) {
     need(ctx, 'company:update'); noDemo(ctx)
-    const name = str(body, 'name', 2, 160)!
-    if (!['headquarters', 'manufacturing', 'warehouse', 'distribution'].includes(body.kind as string)) v422('kind', 'Invalid location kind')
-    const l: Loc = { id: uid(), company_id: ctx.company!.id, name, kind: body.kind as string, city: (body.city as string) || null, country: (body.country as string) || null }
+    const l = locFrom(body, ctx.company!.id)
     S.locations.push(l)
     audit({ action: 'location.created', company_id: l.company_id, actor_user_id: ctx.user.id, entity_type: 'location', entity_id: l.id, details: { kind: l.kind } })
     return [201, l]
+  }
+  if (M('POST', '/company/locations/bulk')) {
+    need(ctx, 'company:update'); noDemo(ctx)
+    const rows = (body.locations as Rec[]) ?? []
+    if (!rows.length || rows.length > 500) v422('locations', 'Provide 1–500 locations')
+    const built = rows.map((r, i) => { try { return locFrom(r, ctx.company!.id) } catch (e) { if (e instanceof HttpError) err(422, [{ loc: ['body', 'locations', i], msg: `Row ${i + 1}: ${JSON.stringify(e.detail)}` }]); throw e } })
+    S.locations.push(...built)
+    audit({ action: 'location.bulk_imported', company_id: ctx.company!.id, actor_user_id: ctx.user.id, entity_type: 'location', details: { count: built.length } })
+    return [201, built]
+  }
+  if (M('PATCH', /^\/company\/locations\/[\w-]+$/)) {
+    need(ctx, 'company:update'); noDemo(ctx)
+    const id = path.split('/').pop()!, l = mine(S.locations, ctx).find((x) => x.id === id)
+    if (!l) err(404, 'Location not found')
+    Object.assign(l!, { ...locFrom(body, l!.company_id), id: l!.id })
+    audit({ action: 'location.updated', company_id: l!.company_id, actor_user_id: ctx.user.id, entity_type: 'location', entity_id: id })
+    return [200, l]
   }
   if (M('DELETE', /^\/company\/locations\/[\w-]+$/)) {
     need(ctx, 'company:update'); noDemo(ctx)
@@ -291,6 +329,49 @@ async function route(method: string, path: string, q: URLSearchParams, body: Rec
     if (body.is_active === false || 'role' in body) revokeAll(target.id)
     audit({ action: 'user.updated', company_id: target.company_id, actor_user_id: ctx.user.id, entity_type: 'user', entity_id: target.id, details: body })
     return [200, userOut(target)]
+  }
+  // ---- routes & live risk ----
+  if (M('GET', '/routes')) { need(ctx, 'ops:read'); return [200, mine(S.routes as never[], ctx).map((r: Rec) => routeOut(r))] }
+  if (M('POST', '/routes')) {
+    need(ctx, 'ops:write')
+    const r = buildRoute(ctx, body); S.routes.push(r)
+    audit({ action: 'route.created', company_id: ctx.company!.id, actor_user_id: ctx.user.id, entity_type: 'route', entity_id: r.id as string, details: { name: r.name, mode: r.mode } })
+    return [201, routeOut(r)]
+  }
+  if (M('POST', '/routes/bulk')) {
+    need(ctx, 'ops:write')
+    const rows = (body.routes as Rec[]) ?? []
+    if (!rows.length || rows.length > 500) v422('routes', 'Provide 1–500 routes')
+    const built = rows.map((row, i) => { try { return buildRoute(ctx, row) } catch (e) { if (e instanceof HttpError) err(e.status, `Row ${i + 1}: ${typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)}`); throw e } })
+    S.routes.push(...built)
+    audit({ action: 'route.bulk_imported', company_id: ctx.company!.id, actor_user_id: ctx.user.id, entity_type: 'route', details: { count: built.length } })
+    return [201, built.map((r) => routeOut(r))]
+  }
+  if (M('DELETE', /^\/routes\/[\w-]+$/)) {
+    need(ctx, 'ops:write')
+    const r = ownRoute(ctx, path.split('/')[2])
+    S.routes = S.routes.filter((x) => x.id !== r.id); S.checks = S.checks.filter((c) => c.route_id !== r.id)
+    audit({ action: 'route.deleted', company_id: ctx.company!.id, actor_user_id: ctx.user.id, entity_type: 'route', entity_id: r.id as string, details: { name: r.name } })
+    return [204, null]
+  }
+  if (M('POST', /^\/routes\/[\w-]+\/risk-checks$/)) {
+    need(ctx, 'ops:read')
+    const r = ownRoute(ctx, path.split('/')[2])
+    const factors = (body.factors as Rec[]) ?? [], sources = (body.sources as Rec[]) ?? []
+    if (!sources.length) v422('sources', 'At least one source is required')
+    const expected = Math.min(100, factors.reduce((a, f) => a + Number(f.points ?? 0), 0))
+    if (body.score !== expected) err(422, `Score ${body.score} does not match its factors (${expected})`)
+    const c = { id: uid(), company_id: ctx.company!.id, route_id: r.id, score: expected, band: bandOf(expected), factors, sources,
+      forecast_days: body.forecast_days ?? 3, rules_version: String(body.rules_version ?? ''), checked_by: ctx.user.id, checked_at: nowIso() }
+    S.checks.push(c)
+    audit({ action: 'route.risk_checked', company_id: ctx.company!.id, actor_user_id: ctx.user.id, entity_type: 'route', entity_id: r.id as string,
+      details: { score: c.score, band: c.band, failed_sources: sources.filter((x) => x.status === 'failed').map((x) => x.name) } })
+    return [201, c]
+  }
+  if (M('GET', /^\/routes\/[\w-]+\/risk-checks$/)) {
+    need(ctx, 'ops:read')
+    const r = ownRoute(ctx, path.split('/')[2])
+    return [200, S.checks.filter((c) => c.route_id === r.id).sort((a, b) => String(b.checked_at).localeCompare(String(a.checked_at))).slice(0, 50)]
   }
   // ---- operations & dashboard ----
   if (M('GET', '/dashboard/overview')) { need(ctx, 'ops:read'); return [200, overview(ctx)] }

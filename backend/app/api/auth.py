@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-from app.models import Company, User
-from app.models.base import utcnow
+from app.models import Company
 from app.schemas import CompanyRegistration, LoginRequest, MeOut, RefreshRequest, TokenPair
 from app.security.deps import AuthContext, get_auth
-from app.services import audit, auth_service
-from app.services.demo_seed import DEMO_USER_EMAIL
+from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -34,22 +31,6 @@ def refresh(data: RefreshRequest, request: Request, db: Session = Depends(get_db
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(request: Request, auth: AuthContext = Depends(get_auth), db: Session = Depends(get_db)):
     auth_service.logout(db, auth.session_id, auth.user, request)
-
-
-@router.post("/demo", response_model=TokenPair)
-def demo_login(request: Request, db: Session = Depends(get_db)):
-    """Open the simulated Aureon Electronics demo workspace as a read-only analyst."""
-    user = db.scalar(select(User).where(User.email == DEMO_USER_EMAIL))
-    if user is None or user.company_id is None:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Demo workspace is not seeded")
-    company = db.get(Company, user.company_id)
-    if company is None or not company.is_demo:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Demo workspace is not available")
-    tokens = auth_service.issue_session(db, user, request)
-    user.last_login_at = utcnow()
-    audit.record(db, action="auth.demo_login", company_id=company.id, actor_user_id=user.id, request=request)
-    db.commit()
-    return tokens
 
 
 @router.get("/me", response_model=MeOut)

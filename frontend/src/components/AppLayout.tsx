@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Activity, Bot, Boxes, BrainCircuit, Building2, ClipboardList, Gauge, Globe2, IndianRupee, LogOut,
+  Activity, Bot, Boxes, BrainCircuit, Building2, ClipboardList, CloudSun, Gauge, Globe2, IndianRupee, LogOut, Map,
   Menu, Moon, PackageSearch, Route, Scale, Ship, Smile, Sun, Truck, X,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { titleCase } from '../lib/format'
-import { Logo, SimulatedBanner } from './ui'
+import { Logo } from './ui'
 
 export const SECTIONS = [
   { to: '/app', label: 'Executive Overview', icon: Gauge, end: true },
-  { to: '/app/disruptions', label: 'Global Disruptions', icon: Globe2 },
+  { to: '/app/map', label: 'Route & Risk Map', icon: Map },
+  { to: '/app/weather', label: 'Weather Forecast', icon: CloudSun },
+  { to: '/app/disruptions', label: 'Disruption Log', icon: Globe2 },
   { to: '/app/inventory', label: 'Inventory Intelligence', icon: Boxes },
   { to: '/app/logistics', label: 'Logistics Analytics', icon: Route, phase: 3 },
   { to: '/app/shipments', label: 'Shipment Tracking', icon: Ship },
@@ -64,7 +66,7 @@ export default function AppLayout() {
       ))}
       <div className="mt-auto rounded-lg border border-slate-200 p-3 text-xs dark:border-ink-700">
         <div className="flex items-center gap-1.5 font-semibold"><Activity size={13} className="text-calm" /> Agent layer</div>
-        <p className="mt-1 text-slate-500 dark:text-slate-400">Agents and the orchestrator switch on in Phase 2. Current figures are deterministic calculations on your data.</p>
+        <p className="mt-1 text-slate-500 dark:text-slate-400">Live risk checks use public weather and hazard feeds. AI agents switch on in Phase 2.</p>
       </div>
     </nav>
   )
@@ -92,7 +94,6 @@ export default function AppLayout() {
           <button onClick={() => { nav('/'); void logout() }} className="btn-ghost !px-3" title="Sign out"><LogOut size={16} /><span className="hidden sm:inline">Sign out</span></button>
         </header>
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {me?.is_demo && <div className="mb-4"><SimulatedBanner /></div>}
           <Outlet />
         </main>
       </div>

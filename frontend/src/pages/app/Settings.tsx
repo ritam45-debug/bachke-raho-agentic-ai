@@ -5,12 +5,13 @@ import { useAuth } from '../../lib/auth'
 import { useApi } from '../../lib/useApi'
 import { dateTime, titleCase } from '../../lib/format'
 import { Badge, ErrorBox, Loading, PageHeader, Table } from '../../components/ui'
+import PlaceSearch from '../../components/PlaceSearch'
 
 interface Company {
   id: string; name: string; slug: string; industry: string; company_size: string; headquarters: string; country: string | null
   registration_number: string | null; is_demo: boolean; ai_external_processing: boolean; data_retention_days: number
   description: string | null; product_categories: string[]; website: string | null; currency: string; created_at: string
-  locations: { id: string; name: string; kind: string; city: string | null; country: string | null }[]
+  locations: { id: string; name: string; kind: string; city: string | null; country: string | null; latitude: number | null; longitude: number | null }[]
 }
 interface U { id: string; email: string; full_name: string; job_title: string | null; role: string; is_active: boolean; last_login_at: string | null }
 
@@ -24,7 +25,7 @@ export default function SettingsPage() {
   const editable = can('company:update') && !me?.is_demo
   const [form, setForm] = useState<Partial<Company>>({})
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const [loc, setLoc] = useState({ name: '', kind: 'warehouse', city: '', country: '' })
+  const [loc, setLoc] = useState<{ name: string; kind: string; city: string; country: string; latitude?: number; longitude?: number }>({ name: '', kind: 'warehouse', city: '', country: '' })
   useEffect(() => { if (c) setForm({ name: c.name, industry: c.industry, headquarters: c.headquarters, description: c.description ?? '', website: c.website ?? '', currency: c.currency, ai_external_processing: c.ai_external_processing, data_retention_days: c.data_retention_days }) }, [c])
 
   if (loading) return <Loading />
@@ -64,19 +65,23 @@ export default function SettingsPage() {
               <div key={l.id} className="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 text-sm dark:border-ink-800">
                 <Badge value={l.kind} tone={l.kind === 'manufacturing' ? 'amber' : l.kind === 'headquarters' ? 'violet' : 'blue'} />
                 <span className="flex-1">{l.name}</span><span className="text-xs text-slate-500">{[l.city, l.country].filter(Boolean).join(', ')}</span>
+                {l.latitude != null ? <span className="text-[11px] text-calm" title={`${l.latitude}, ${l.longitude}`}>on map</span>
+                  : editable ? <span className="w-44"><PlaceSearch placeholder="Place on map…" onSelect={(p) => run(() => api(`/company/locations/${l.id}`, { method: 'PATCH', json: { name: l.name, kind: l.kind, city: l.city ?? p.name, country: l.country ?? p.country ?? null, latitude: p.latitude, longitude: p.longitude } }), `${l.name} placed on the map.`)} /></span>
+                  : <span className="text-[11px] text-amber-600">not on map</span>}
                 {editable && <button aria-label="Delete location" className="p-1 text-slate-400 hover:text-red-500" onClick={() => run(() => api(`/company/locations/${l.id}`, { method: 'DELETE' }), 'Location removed.')}><Trash2 size={15} /></button>}
               </div>
             ))}
           </div>
-          {editable && (
-            <form className="mt-4 grid gap-2 sm:grid-cols-[1.3fr_1.2fr_1fr_1fr_auto]" onSubmit={(e) => { e.preventDefault(); void run(() => api('/company/locations', { method: 'POST', json: { ...loc, city: loc.city || null, country: loc.country || null } }), 'Location added.').then(() => setLoc({ name: '', kind: 'warehouse', city: '', country: '' })) }}>
+          {editable && (<>
+            <div className="mt-4"><PlaceSearch placeholder="Find the new location's place (fills city, country and map position)…" onSelect={(p) => setLoc((x) => ({ ...x, name: x.name || p.name, city: p.name, country: p.country ?? '', latitude: p.latitude, longitude: p.longitude }))} /></div>
+            <form className="mt-2 grid gap-2 sm:grid-cols-[1.3fr_1.2fr_1fr_1fr_auto]" onSubmit={(e) => { e.preventDefault(); void run(() => api('/company/locations', { method: 'POST', json: { ...loc, city: loc.city || null, country: loc.country || null, latitude: loc.latitude ?? null, longitude: loc.longitude ?? null } }), 'Location added.').then(() => setLoc({ name: '', kind: 'warehouse', city: '', country: '' })) }}>
               <input required minLength={2} className="input" placeholder="Name" value={loc.name} onChange={(e) => setLoc({ ...loc, name: e.target.value })} />
               <select className="input" value={loc.kind} onChange={(e) => setLoc({ ...loc, kind: e.target.value })}>{['manufacturing', 'warehouse', 'distribution', 'headquarters'].map((k) => <option key={k}>{k}</option>)}</select>
               <input className="input" placeholder="City" value={loc.city} onChange={(e) => setLoc({ ...loc, city: e.target.value })} />
               <input className="input" placeholder="Country" value={loc.country} onChange={(e) => setLoc({ ...loc, country: e.target.value })} />
               <button className="btn-ghost"><Plus size={15} />Add</button>
             </form>
-          )}
+          </>)}
         </Section>
       </div>
       {can('users:read') && <div className="mt-5"><Team editable={can('users:manage') && !me?.is_demo} selfId={me?.id ?? ''} /></div>}

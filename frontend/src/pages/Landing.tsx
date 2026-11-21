@@ -1,6 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, Eye, FlaskConical, Lock, Radar, ShieldCheck, Workflow } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, CloudSun, Lock, Map, Radar, ShieldCheck, Workflow } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { Logo } from '../components/ui'
 import { ThemeToggle } from '../components/AppLayout'
@@ -20,15 +19,7 @@ const PILLARS = [
 ]
 
 export default function Landing() {
-  const { demo, me } = useAuth()
-  const nav = useNavigate()
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  const openDemo = async () => {
-    setBusy(true); setErr(null)
-    try { await demo(); nav('/app') } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
-  }
+  const { me } = useAuth()
 
   return (
     <div className="min-h-full">
@@ -60,13 +51,10 @@ export default function Landing() {
             works out what each risk would cost, and proposes the fix — for a human to approve.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <button onClick={openDemo} disabled={busy} className="btn-primary !px-5 !py-3 text-base">
-              <FlaskConical size={18} /> {busy ? 'Opening…' : 'Open demo workspace'}
-            </button>
-            <Link to="/register" className="btn-ghost !px-5 !py-3 text-base">Register your company <ArrowRight size={18} /></Link>
+            <Link to="/register" className="btn-primary !px-5 !py-3 text-base">Register your company <ArrowRight size={18} /></Link>
+            <Link to="/login" className="btn-ghost !px-5 !py-3 text-base">Company login</Link>
           </div>
-          {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
-          <p className="mt-3 text-xs text-slate-500">The demo uses a fictional company (Aureon Electronics) with clearly labelled simulated data.</p>
+          <p className="mt-3 text-xs text-slate-500">Setup takes a few minutes: add your sites and routes (or import a CSV) and run your first live risk check.</p>
         </div>
 
         <div className="card self-start p-6">
@@ -94,7 +82,8 @@ export default function Landing() {
         </div>
         <div className="mx-auto mt-10 flex max-w-6xl flex-wrap gap-x-8 gap-y-2 px-5 text-xs text-slate-500">
           <span className="flex items-center gap-1.5"><Lock size={13} /> Per-company isolated workspaces</span>
-          <span className="flex items-center gap-1.5"><Eye size={13} /> Simulated data is always labelled</span>
+          <span className="flex items-center gap-1.5"><Map size={13} /> Live route map: weather, sea state, earthquakes, storms</span>
+          <span className="flex items-center gap-1.5"><CloudSun size={13} /> Up to 16-day weather forecasts for every site</span>
           <span className="flex items-center gap-1.5"><ShieldCheck size={13} /> Your data goes to an external AI only after you opt in</span>
         </div>
       </section>

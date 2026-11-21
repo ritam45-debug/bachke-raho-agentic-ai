@@ -1,15 +1,18 @@
 import type { ReactNode } from 'react'
-import { FlaskConical, Hammer, Loader2, TriangleAlert } from 'lucide-react'
+import { Hammer, Loader2, TriangleAlert } from 'lucide-react'
 import { titleCase } from '../lib/format'
 
 export function Logo({ size = 36, withText = true }: { size?: number; withText?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
       <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden className="shrink-0">
-        <path d="M32 4 8 13v17c0 15 10 26 24 30 14-4 24-15 24-30V13z" className="fill-ink-900 dark:fill-ink-800" />
-        <path d="M32 10 14 17v13c0 11 7 20 18 24 11-4 18-13 18-24V17z" fill="none" stroke="#f5a524" strokeWidth="3" />
-        <path d="M20 38l8-9 6 5 10-12" fill="none" stroke="#2dd4bf" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="44" cy="22" r="3.5" fill="#f5a524" />
+        {/* Umbrella ("bachke raho": stay safe) sheltering a route; radar arc = forecasting */}
+        <rect width="64" height="64" rx="16" className="fill-ink-900 dark:fill-ink-800" />
+        <path d="M17 15.5a21 21 0 0 1 30 0" fill="none" stroke="#2dd4bf" strokeWidth="2.5" strokeLinecap="round" opacity=".55" />
+        <path d="M11 33a21 21 0 0 1 42 0q-5.25-4.2-10.5 0q-5.25-4.2-10.5 0q-5.25-4.2-10.5 0Q16.25 28.8 11 33z" fill="#f5a524" />
+        <path d="M32 33v12.5a6 6 0 0 1-6 6h-3.5" fill="none" stroke="#2dd4bf" strokeWidth="3.5" strokeLinecap="round" />
+        <circle cx="19.5" cy="51.5" r="3.5" fill="#2dd4bf" />
+        <circle cx="32" cy="12" r="2.6" fill="#f5a524" />
       </svg>
       {withText && (
         <div className="leading-tight">
@@ -46,15 +49,6 @@ export function SeverityPill({ score }: { score: number }) {
   const tone = score >= 75 ? 'red' : score >= 50 ? 'amber' : score >= 25 ? 'blue' : 'green'
   const band = score >= 75 ? 'High' : score >= 50 ? 'Elevated' : score >= 25 ? 'Moderate' : 'Low'
   return <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold ${TONE[tone]}`}><span className="num">{score}</span>{band}</span>
-}
-
-export function SimulatedBanner() {
-  return (
-    <div className="flex items-start gap-2 rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-500/40 dark:bg-violet-500/10 dark:text-violet-200">
-      <FlaskConical size={15} className="mt-0.5 shrink-0" />
-      <span><b>Simulated data.</b> This is the fictional Aureon Electronics demo workspace. Companies, suppliers, shipments and events are invented and nothing here is real-time.</span>
-    </div>
-  )
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {

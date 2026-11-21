@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth'
 import { ErrorBox, Logo } from '../components/ui'
 
 export default function Login() {
-  const { login, demo } = useAuth()
+  const { login } = useAuth()
   const nav = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -33,7 +33,6 @@ export default function Login() {
         </form>
         <div className="mt-4 flex justify-between text-sm">
           <Link to="/register" className="text-signal hover:underline">Register a company</Link>
-          <button className="text-slate-500 hover:underline" onClick={async () => { await demo(); nav('/app') }}>Try the demo</button>
         </div>
       </div>
     </div>

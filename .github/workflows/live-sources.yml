@@ -1,0 +1,37 @@
+# Checks that every live data source the browser calls is reachable and allows cross-origin requests (CORS).
+# Runs weekly and on demand, so a provider change is noticed before users hit it.
+name: Live data sources
+on:
+  workflow_dispatch:
+  schedule: [{ cron: "17 4 * * 1" }]
+  push:
+    branches: [main]
+    paths: ["frontend/src/lib/liveData.ts", ".github/workflows/live-sources.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe sources with a browser-like Origin header
+        run: |
+          ORIGIN="https://ritam45-debug.github.io"
+          fail=0
+          check() {
+            name="$1"; url="$2"
+            out=$(curl -s -m 25 -o /tmp/body -D - -H "Origin: $ORIGIN" -H "User-Agent: bachke-raho-ci (github.com/ritam45-debug/bachke-raho-agentic-ai)" "$url")
+            code=$(echo "$out" | head -1 | awk '{print $2}')
+            acao=$(echo "$out" | grep -i '^access-control-allow-origin' | tr -d '\r' | cut -d' ' -f2-)
+            size=$(wc -c < /tmp/body)
+            echo "| $name | HTTP $code | CORS: ${acao:-MISSING} | ${size} bytes |" | tee -a "$GITHUB_STEP_SUMMARY"
+            if [ "$code" != "200" ] || [ -z "$acao" ]; then fail=1; fi
+          }
+          echo "| Source | Status | CORS | Size |" >> "$GITHUB_STEP_SUMMARY"; echo "|---|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          check "Open-Meteo forecast (2 points)" "https://api.open-meteo.com/v1/forecast?latitude=13.08,1.29&longitude=80.27,103.85&daily=weather_code,precipitation_sum,wind_gusts_10m_max&forecast_days=3&timezone=auto"
+          check "Open-Meteo marine" "https://marine-api.open-meteo.com/v1/marine?latitude=10&longitude=88&daily=wave_height_max&forecast_days=3&timezone=auto"
+          check "Open-Meteo geocoding" "https://geocoding-api.open-meteo.com/v1/search?name=Chennai&count=1&format=json"
+          check "USGS earthquakes" "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson"
+          check "NASA EONET" "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&days=30"
+          check "OSRM road routing" "https://router.project-osrm.org/route/v1/driving/73.86,18.52;72.88,19.07?overview=simplified&geometries=geojson"
+          tiles=$(curl -s -m 20 -o /dev/null -w '%{http_code}' -H "Referer: $ORIGIN/" -H "User-Agent: Mozilla/5.0 (bachke-raho-ci)" https://tile.openstreetmap.org/3/5/3.png)
+          echo "| OSM tile | HTTP $tiles | (image; no CORS needed) | |" | tee -a "$GITHUB_STEP_SUMMARY"
+          exit $fail

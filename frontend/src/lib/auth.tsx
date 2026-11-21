@@ -10,7 +10,6 @@ interface AuthState {
   me: Me | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  demo: () => Promise<void>
   register: (body: unknown) => Promise<void>
   logout: () => Promise<void>
   can: (perm: string) => boolean
@@ -36,7 +35,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = {
     me, loading,
     login: (email, password) => withTokens(api('/auth/login', { method: 'POST', json: { email, password } })),
-    demo: () => withTokens(api('/auth/demo', { method: 'POST' })),
     register: (body) => withTokens(api('/auth/register-company', { method: 'POST', json: body })),
     logout: async () => {
       try { await api('/auth/logout', { method: 'POST' }) } catch { /* session may already be gone */ }

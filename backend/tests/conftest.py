@@ -7,7 +7,6 @@ os.environ.update({
     "ENVIRONMENT": "test",
     "DATABASE_URL": os.getenv("TEST_DATABASE_URL", f"sqlite:///{Path(_tmp) / 'test.db'}"),
     "JWT_SECRET": "test-secret-" + "x" * 40,
-    "SEED_DEMO_ON_STARTUP": "true",
 })
 
 import pytest  # noqa: E402
@@ -34,7 +33,8 @@ def register(client, name=None, email=None, **extra):
     body = {
         "company_name": name or f"Test Co {n}", "industry": "Electronics", "company_size": "51-200",
         "headquarters": "Chennai, India", "country": "India", "product_categories": ["Sensors"],
-        "locations": [{"name": f"Plant {n}", "kind": "manufacturing", "city": "Chennai", "country": "India"}],
+        "locations": [{"name": f"Plant {n}", "kind": "manufacturing", "city": "Chennai", "country": "India",
+                       "latitude": 12.97, "longitude": 79.95}],
         "admin_full_name": "Admin Person", "admin_email": email or f"admin{n}@co{n}.example.com",
         "password": STRONG_PW, "accept_terms": True, **extra,
     }

@@ -37,7 +37,6 @@ class Settings(BaseSettings):
     # Tenants must opt in before any of their data is sent to an external AI provider.
     ai_external_processing_default: bool = False
 
-    seed_demo_on_startup: bool = True
 
     @field_validator("environment")
     @classmethod

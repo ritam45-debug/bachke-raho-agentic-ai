@@ -1,9 +1,0 @@
-name,kind,city,country,latitude,longitude,capacity_units
-Aureon HQ – Pune,headquarters,Pune,India,18.52,73.86,
-Plant 1 – Chakan (Pune),manufacturing,Pune,India,18.76,73.86,40000
-Plant 2 – Sriperumbudur,manufacturing,Chennai,India,12.97,79.95,55000
-Plant 3 – Noida,manufacturing,Noida,India,28.54,77.39,30000
-WH – Bhiwandi,warehouse,Mumbai,India,19.3,73.06,120000
-WH – Hoskote,warehouse,Bengaluru,India,13.07,77.8,80000
-WH – Dankuni,warehouse,Kolkata,India,22.68,88.29,50000
-DC – Gurugram,distribution,Gurugram,India,28.46,77.03,60000

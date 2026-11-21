@@ -47,7 +47,7 @@ AI estimate with its assumptions shown.
 
 ```
 ┌────────────────────────── Browser (React + Vite + Tailwind + Recharts) ──────────────────────────┐
-│ Landing · Register · Login · Demo · 14 dashboard sections · (P2) AI chat · (P3) risk map         │
+│ Landing · Register · Login · Route & Risk Map · Weather · dashboard sections · (P2) AI chat      │
 └───────────────────────────────────────────────┬──────────────────────────────────────────────────┘
                                                 │ HTTPS, JWT bearer
 ┌───────────────────────────────────────────────▼──────────────────────────────────────────────────┐
@@ -58,7 +58,7 @@ AI estimate with its assumptions shown.
 │  ├─ orchestrator/ LangGraph state machine + Postgres checkpointer + approval interrupts   [P2,P6] │
 │  ├─ agents/     specialist agents = prompt + tool allow-list + output schema              [P2–P5] │
 │  ├─ integrations/ AI gateway (Claude), weather, news/RSS, tracking, commodities, regs     [P2–P5] │
-│  └─ services/   audit, tenant repo, demo seed, notifications                              [Built/P6]│
+│  └─ services/   audit, tenant repo, notifications                                         [Built/P6]│
 └───────┬───────────────────────────────┬─────────────────────────────────┬────────────────────────┘
         │ SQL (non-owner role, RLS)     │ jobs                              │ outbound HTTPS
 ┌───────▼─────────┐            ┌────────▼────────┐                 ┌───────▼────────────────────────┐
@@ -176,6 +176,7 @@ All Claude calls go through one module, `integrations/ai_gateway.py`:
 
 | Phase | Tables |
 |---|---|
+| 1+ (built) | `routes`, `route_risk_checks` (RLS; score must equal its factors) |
 | 2 | `ai_conversations`, `ai_messages`, `agent_runs`, `agent_steps` (execution history), `tool_calls`, LangGraph checkpoint tables |
 | 3 | `global_events` (platform-wide, not tenant-owned) + `company_event_impacts` (RLS); `logistics_routes`, `route_quotes`, `shipment_tracking_events`, `uploads` |
 | 4 | `vendor_assessments`, `vendor_scorecards`, `scoring_weight_profiles` (CHECK sum = 100), `purchase_orders`, `po_lines`, `production_batches`, `bom_lines`, `financial_analyses`, `risk_assessments` |
@@ -231,7 +232,9 @@ before a contract is signed, and simulated output is always labelled.
 | Executive dashboard KPIs and charts; inventory status (days of cover, ROP, safety-stock bands) | **Working** on stored data |
 | Inventory / shipments / vendors / disruptions / products tables with search, filter, CSV export | **Working** |
 | Audit log with filter and CSV export; append-only on Postgres | **Working** |
-| Demo workspace (Aureon Electronics, simulated, read-only) | **Working** |
+| Route & Risk Map: live map, place search, routes, live risk checks with stored history | **Working** (public feeds, see LIVE_DATA.md) |
+| Weather Forecast: 3–16-day forecasts and flagged days for every site | **Working** (Open-Meteo) |
+| CSV import of locations and routes, getting-started checklist | **Working** |
 | Light/dark theme, desktop/tablet/mobile layout | **Working** |
 | Data upload (CSV/Excel/PDF) | Phase 3. Needs no external service |
 | Vendor weighted scoring, finance engine, risk scores | Phases 3–4. Needs no external service |

@@ -13,7 +13,7 @@
 | RBAC | 7 roles, code-defined permission matrix; `super_admin` not assignable via tenant APIs and cannot read tenant ops data | ✅ |
 | Last-admin protection | Cannot demote/deactivate the only active company admin | ✅ |
 | Audit | Append-only (DB trigger), secrets redacted from details, CSV export is itself audited | ✅ |
-| Demo workspace | Read-only; demo users have random undisclosed passwords | ✅ |
+| Live risk checks | Server rejects any check whose score ≠ capped sum of its factors; band derived server-side; every check audited | ✅ |
 | Secrets | Only from env; production refuses to boot without a ≥32-char `JWT_SECRET` or with SQLite | — |
 | Headers | nosniff, frame DENY, no-referrer, no-store; HSTS in production; `/docs` disabled in production | ✅ |
 | External AI | Per-tenant consent flag, off by default (enforced by gateway from Phase 2) | flag ✅ |

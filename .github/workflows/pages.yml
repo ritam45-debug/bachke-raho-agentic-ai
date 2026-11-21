@@ -1,5 +1,5 @@
 # Publishes the single-file browser preview (frontend/dist-preview) to GitHub Pages on every push to main.
-# The preview runs its API inside the browser with simulated data; it is a demo, not the secure deployment.
+# The preview runs its API inside the browser (data stays in each visitor's browser); it is not the secure deployment.
 name: Deploy preview to GitHub Pages
 on:
   push: { branches: [main] }

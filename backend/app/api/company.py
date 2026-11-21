@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.models import CompanyProfile, Location
-from app.schemas import CompanyOut, CompanyUpdate, LocationIn, LocationOut
+from app.schemas import CompanyOut, CompanyUpdate, LocationBulk, LocationIn, LocationOut
 from app.security.deps import TenantContext, require
 from app.security.rbac import Perm
 from app.services import audit
@@ -72,6 +72,35 @@ def add_location(data: LocationIn, request: Request,
     db.flush()
     audit.record(db, action="location.created", company_id=ctx.company_id, actor_user_id=ctx.user.id,
                  entity_type="location", entity_id=loc.id, request=request, details={"kind": loc.kind})
+    db.commit()
+    return LocationOut.model_validate(loc)
+
+
+@router.post("/locations/bulk", response_model=list[LocationOut], status_code=status.HTTP_201_CREATED)
+def add_locations_bulk(data: LocationBulk, request: Request,
+                       ctx: TenantContext = Depends(require(Perm.COMPANY_UPDATE)), db: Session = Depends(get_db)):
+    """Import many locations at once (e.g. from CSV). Validated as a whole before anything is saved."""
+    _block_demo_writes(ctx)
+    locs = [Location(company_id=ctx.company_id, **x.model_dump()) for x in data.locations]
+    db.add_all(locs)
+    db.flush()
+    audit.record(db, action="location.bulk_imported", company_id=ctx.company_id, actor_user_id=ctx.user.id,
+                 entity_type="location", request=request, details={"count": len(locs)})
+    db.commit()
+    return [LocationOut.model_validate(x) for x in locs]
+
+
+@router.patch("/locations/{location_id}", response_model=LocationOut)
+def update_location(location_id: str, data: LocationIn, request: Request,
+                    ctx: TenantContext = Depends(require(Perm.COMPANY_UPDATE)), db: Session = Depends(get_db)):
+    _block_demo_writes(ctx)
+    loc = db.scalar(scoped(Location, ctx).where(Location.id == location_id))
+    if loc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Location not found")
+    for k, v in data.model_dump().items():
+        setattr(loc, k, v)
+    audit.record(db, action="location.updated", company_id=ctx.company_id, actor_user_id=ctx.user.id,
+                 entity_type="location", entity_id=loc.id, request=request)
     db.commit()
     return LocationOut.model_validate(loc)
 

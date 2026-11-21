@@ -12,6 +12,8 @@ import OverviewPage from './pages/app/Overview'
 import { DisruptionsPage, InventoryPage, ProductsPage, ShipmentsPage, VendorsPage } from './pages/app/DataPages'
 import SettingsPage from './pages/app/Settings'
 import AuditPage from './pages/app/Audit'
+import RiskMapPage from './pages/app/RiskMap'
+import WeatherPage from './pages/app/Weather'
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -42,6 +44,8 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/app" element={<Protected><AppLayout /></Protected>}>
             <Route index element={<OverviewPage />} />
+            <Route path="map" element={<RiskMapPage />} />
+            <Route path="weather" element={<WeatherPage />} />
             <Route path="disruptions" element={<DisruptionsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="shipments" element={<ShipmentsPage />} />

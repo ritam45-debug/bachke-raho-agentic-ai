@@ -31,6 +31,12 @@ class LocationIn(_Strict):
     kind: LocationKind
     city: str | None = Field(default=None, max_length=120)
     country: str | None = Field(default=None, max_length=80)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+
+
+class LocationBulk(_Strict):
+    locations: list[LocationIn] = Field(min_length=1, max_length=500)
 
 
 class CompanyRegistration(_Strict):
@@ -100,6 +106,8 @@ class LocationOut(BaseModel):
     kind: str
     city: str | None
     country: str | None
+    latitude: float | None
+    longitude: float | None
 
 
 class CompanyOut(BaseModel):
@@ -202,3 +210,82 @@ class AuditOut(BaseModel):
     ip_address: str | None
     details: dict
     created_at: datetime
+
+
+# ---------- routes & live risk ----------
+RouteMode = Literal["sea", "air", "road", "rail"]
+RiskBand = Literal["low", "moderate", "elevated", "high"]
+
+
+class RouteIn(_Strict):
+    name: str = Field(min_length=2, max_length=160)
+    mode: RouteMode
+    origin_location_id: str | None = Field(default=None, max_length=36)
+    origin_label: str | None = Field(default=None, min_length=2, max_length=200)
+    origin_lat: float | None = Field(default=None, ge=-90, le=90)
+    origin_lon: float | None = Field(default=None, ge=-180, le=180)
+    destination_location_id: str | None = Field(default=None, max_length=36)
+    destination_label: str | None = Field(default=None, min_length=2, max_length=200)
+    destination_lat: float | None = Field(default=None, ge=-90, le=90)
+    destination_lon: float | None = Field(default=None, ge=-180, le=180)
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+class RouteBulk(_Strict):
+    routes: list[RouteIn] = Field(min_length=1, max_length=500)
+
+
+class RiskFactor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(max_length=120)
+    points: int = Field(ge=0, le=100)
+    detail: str = Field(max_length=500)
+    source: str = Field(max_length=120)
+    observed_at: str | None = Field(default=None, max_length=40)
+
+
+class RiskSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(max_length=120)
+    url: str = Field(max_length=300)
+    status: Literal["ok", "failed", "skipped"]
+    fetched_at: str = Field(max_length=40)
+
+
+class RiskCheckIn(_Strict):
+    score: int = Field(ge=0, le=100)
+    band: RiskBand
+    factors: list[RiskFactor] = Field(default_factory=list, max_length=100)
+    sources: list[RiskSource] = Field(min_length=1, max_length=20)
+    forecast_days: int = Field(default=3, ge=1, le=16)
+    rules_version: str = Field(max_length=20)
+
+
+class RiskCheckOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    route_id: str
+    score: int
+    band: str
+    factors: list
+    sources: list
+    forecast_days: int
+    rules_version: str
+    checked_at: datetime
+
+
+class RouteOut(BaseModel):
+    id: str
+    name: str
+    mode: str
+    origin_location_id: str | None
+    origin_label: str
+    origin_lat: float
+    origin_lon: float
+    destination_location_id: str | None
+    destination_label: str
+    destination_lat: float
+    destination_lon: float
+    notes: str | None
+    created_at: datetime
+    latest_check: RiskCheckOut | None = None

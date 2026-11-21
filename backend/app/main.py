@@ -10,9 +10,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import audit_admin, auth, company, dashboard, operations, users
+from app.api import audit_admin, auth, company, dashboard, operations, routes_api, users
 from app.core.config import get_settings
-from app.database.session import SessionLocal, init_db
+from app.database.session import init_db
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 settings = get_settings()
@@ -22,10 +22,6 @@ settings = get_settings()
 async def lifespan(_: FastAPI):
     if settings.database_url.startswith("sqlite"):
         init_db()  # PostgreSQL deployments use `alembic upgrade head` instead
-    if settings.seed_demo_on_startup:
-        from app.services.demo_seed import seed_demo
-        with SessionLocal() as db:
-            seed_demo(db)
     yield
 
 
@@ -71,5 +67,5 @@ def health():
             "ai_enabled": bool(settings.anthropic_api_key), "environment": settings.environment}
 
 
-for r in (auth.router, company.router, users.router, dashboard.router, operations.router, audit_admin.router):
+for r in (auth.router, company.router, users.router, dashboard.router, operations.router, routes_api.router, audit_admin.router):
     app.include_router(r, prefix=settings.api_prefix)
