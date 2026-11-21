@@ -9,6 +9,7 @@ const preview = process.env.VITE_PREVIEW === '1'
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), ...(preview ? [viteSingleFile()] : [])],
+  base: preview ? './' : '/',
   build: preview ? { outDir: 'dist-preview' } : {},
   server: {
     port: 5173,
