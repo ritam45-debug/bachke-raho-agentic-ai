@@ -15,6 +15,7 @@ class Perm(str, Enum):
     OPS_WRITE = "ops:write"
     PROCUREMENT_WRITE = "procurement:write"
     FINANCE_READ = "finance:read"
+    FINANCE_WRITE = "finance:write"         # finance settings and saved scenarios (Phase 4)
     AUDIT_READ = "audit:read"
     APPROVE_HIGH_IMPACT = "approvals:high_impact"  # Phase 6
     AI_USE = "ai:use"                      # chat with agents (Phase 2)
@@ -30,7 +31,7 @@ ROLE_PERMISSIONS: dict[Role, set[Perm]] = {
                                 Perm.FINANCE_READ, Perm.APPROVE_HIGH_IMPACT, Perm.AI_USE},
     Role.PROCUREMENT_MANAGER: {Perm.COMPANY_READ, Perm.USERS_READ, Perm.OPS_READ, Perm.PROCUREMENT_WRITE,
                                Perm.FINANCE_READ, Perm.APPROVE_HIGH_IMPACT, Perm.AI_USE},
-    Role.FINANCE_MANAGER: {Perm.COMPANY_READ, Perm.USERS_READ, Perm.OPS_READ, Perm.FINANCE_READ,
+    Role.FINANCE_MANAGER: {Perm.COMPANY_READ, Perm.USERS_READ, Perm.OPS_READ, Perm.FINANCE_READ, Perm.FINANCE_WRITE,
                            Perm.APPROVE_HIGH_IMPACT, Perm.AI_USE},
     Role.ANALYST: {Perm.COMPANY_READ, Perm.OPS_READ, Perm.FINANCE_READ, Perm.AI_USE},
     Role.READ_ONLY: {Perm.COMPANY_READ, Perm.OPS_READ},

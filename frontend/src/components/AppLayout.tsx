@@ -18,7 +18,7 @@ export const SECTIONS = [
   { to: '/app/shipments', label: 'Shipment Tracking', icon: Ship },
   { to: '/app/vendors', label: 'Vendor Performance', icon: Truck },
   { to: '/app/products', label: 'Product Lifecycle', icon: PackageSearch },
-  { to: '/app/finance', label: 'Financial Intelligence', icon: IndianRupee, phase: 4 },
+  { to: '/app/finance', label: 'Financial Intelligence', icon: IndianRupee, perm: 'finance:read' },
   { to: '/app/compliance', label: 'Legal & Compliance', icon: Scale, phase: 5 },
   { to: '/app/consumer', label: 'Consumer Intelligence', icon: Smile, phase: 5 },
   { to: '/app/memory', label: 'Organisational Memory', icon: BrainCircuit, phase: 5 },

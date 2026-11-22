@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
 import { useApi } from '../../lib/useApi'
 import { date, money, num, titleCase, useCsvDownload } from '../../lib/format'
-import { Badge, ErrorBox, Loading, PageHeader, PhasePanel, SeverityPill, Table, type Col } from '../../components/ui'
+import { Badge, ErrorBox, Loading, PageHeader, SeverityPill, Table, type Col } from '../../components/ui'
 
 type Row = Record<string, unknown>
 
@@ -132,5 +132,5 @@ export function ProductsPage() {
       { key: 'margin', label: 'Gross margin', align: 'right', render: (r) => r.unit_price ? `${num((1 - (r.unit_cost as number) / (r.unit_price as number)) * 100, 1)}%` : '—' },
       { key: 'primary_supplier', label: 'Primary supplier', render: (r) => String(r.primary_supplier ?? '—') },
     ]}
-    after={<PhasePanel phase={4} title="Lifecycle traceability" items={['Link raw materials → batches → finished goods → shipments', 'Product-level cost build-up and profitability', 'Manufacturing bottleneck and defect analysis', 'Returns and feedback traced back to batches']} />} />
+  />
 }

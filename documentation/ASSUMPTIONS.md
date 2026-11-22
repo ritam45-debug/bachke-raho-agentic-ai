@@ -13,3 +13,9 @@ Change any of these and the code or docs will follow.
 9. **Inventory demand inputs** (average daily demand, lead time, safety stock) are supplied with the data in Phase 1; forecasting them is Phase 3.
 10. **Live risk thresholds** for waves, earthquakes and natural-event radii are platform defaults; wind and rain thresholds follow Beaufort and IMD (see LIVE_DATA.md).
 11. **Live feeds are called from the browser** for now (works on static hosting). Moving them server-side, with a scheduler, comes with Phase 3.
+
+## Phase 4 calculations (estimates, not forecasts)
+- **Vendor score** = Σ weight × sub-score (0–100). Price and lead time are min–max scaled across the suppliers being compared; quality, on-time rate and financial stability use their own 0–100 scale; risk uses 100 − risk exposure. A missing input scores 0 and is flagged, so incomplete suppliers are never silently favoured.
+- **Allocation** is a rule-based heuristic (primary share to rank 1, remainder to rank 2, capped by capacity, MOQ respected, shortfall passed down the ranking). It is not a linear-programming optimum; the brief's LP is deferred because no solver runs in the static build.
+- **Holding cost** default carrying rate 20%/year is a planning convention, not a measured figure for any company. Replace it in Financial Intelligence → assumptions.
+- **Disruption impact** = days × revenue/day × margin + days × downtime/day + expediting + penalties. **Expected loss** = likelihood × impact; likelihood is the user's own judgement, never a model output.

@@ -9,7 +9,10 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import OverviewPage from './pages/app/Overview'
-import { DisruptionsPage, InventoryPage, ProductsPage, ShipmentsPage, VendorsPage } from './pages/app/DataPages'
+import { DisruptionsPage, InventoryPage, ShipmentsPage } from './pages/app/DataPages'
+import VendorsPage from './pages/app/Vendors'
+import FinancePage from './pages/app/Finance'
+import LifecyclePage from './pages/app/Lifecycle'
 import SettingsPage from './pages/app/Settings'
 import AuditPage from './pages/app/Audit'
 import RiskMapPage from './pages/app/RiskMap'
@@ -25,7 +28,6 @@ function Protected({ children }: { children: ReactNode }) {
 }
 
 const PLANNED: { path: string; title: string; phase: number; items: string[] }[] = [
-  { path: 'finance', title: 'Financial Intelligence', phase: 4, items: ['Procurement, holding and logistics cost analysis', 'Downtime and revenue-loss estimates (labelled as estimates)', 'Break-even, sensitivity and mitigation ROI', 'Financial impact report per disruption'] },
   { path: 'compliance', title: 'Legal & Compliance', phase: 5, items: ['Regulatory update monitoring with sources and effective dates', 'Affected products/shipments and missing documents', 'Facts kept separate from AI interpretation', 'Not a substitute for qualified legal advice'] },
   { path: 'consumer', title: 'Consumer Intelligence', phase: 5, items: ['Consent-based feedback forms and surveys', 'Sentiment and NPS', 'Recurring complaints and quality issues', 'Feedback linked to batches and shipments'] },
   { path: 'memory', title: 'Organisational Memory', phase: 5, items: ['Contracts, POs, policies and past decisions', 'Permission-aware document retrieval (pgvector)', 'History pulled in before every major recommendation', 'Admin review, export and deletion'] },
@@ -54,7 +56,8 @@ export default function App() {
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="shipments" element={<ShipmentsPage />} />
             <Route path="vendors" element={<VendorsPage />} />
-            <Route path="products" element={<ProductsPage />} />
+            <Route path="products" element={<LifecyclePage />} />
+            <Route path="finance" element={<FinancePage />} />
             <Route path="audit" element={<AuditPage />} />
             <Route path="settings" element={<SettingsPage />} />
             {PLANNED.map((p) => (

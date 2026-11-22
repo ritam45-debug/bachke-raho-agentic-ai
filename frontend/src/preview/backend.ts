@@ -8,17 +8,17 @@ interface Loc { id: string; company_id: string; name: string; kind: string; city
 interface User { id: string; company_id: string; email: string; full_name: string; job_title: string | null; role: string; pw: string; salt: string; is_active: boolean; failed: number; locked_until: number | null; last_login_at: string | null; created_at: string }
 interface Session { id: string; user_id: string; access: string; refresh: string; access_exp: number; refresh_exp: number; revoked: boolean }
 interface Audit { id: string; company_id: string | null; actor_user_id: string | null; actor_type: string; action: string; entity_type: string | null; entity_id: string | null; outcome: string; ip_address: string | null; details: Rec; created_at: string }
-interface State { v: 2; companies: Company[]; profiles: Profile[]; locations: Loc[]; users: User[]; sessions: Session[]; audit: Audit[]; ops: Record<string, Rec[]>; routes: Rec[]; checks: Rec[]; ai?: { convs: Rec[]; msgs: Rec[]; runs: Rec[]; steps: Rec[] } }
+interface State { v: 2; companies: Company[]; profiles: Profile[]; locations: Loc[]; users: User[]; sessions: Session[]; audit: Audit[]; ops: Record<string, Rec[]>; routes: Rec[]; checks: Rec[]; p4?: { weights: Rec; finance: Rec; scenarios: Rec[]; bom: Rec[] }; ai?: { convs: Rec[]; msgs: Rec[]; runs: Rec[]; steps: Rec[] } }
 
 const KEY = 'bra.preview.state.v2' // v1 held the removed Aureon demo
 const ACCESS_MS = 30 * 60e3, REFRESH_MS = 7 * 864e5, MAX_FAIL = 5, LOCK_MS = 15 * 60e3
 const ROLES = ['company_admin', 'supply_chain_manager', 'procurement_manager', 'finance_manager', 'analyst', 'read_only']
-const ALL = ['company:read', 'company:update', 'users:read', 'users:manage', 'ops:read', 'ops:write', 'procurement:write', 'finance:read', 'audit:read', 'approvals:high_impact', 'ai:use']
+const ALL = ['company:read', 'company:update', 'users:read', 'users:manage', 'ops:read', 'ops:write', 'procurement:write', 'finance:read', 'finance:write', 'audit:read', 'approvals:high_impact', 'ai:use']
 const PERMS: Record<string, string[]> = {
   company_admin: ALL,
   supply_chain_manager: ['company:read', 'users:read', 'ops:read', 'ops:write', 'finance:read', 'approvals:high_impact', 'ai:use'],
   procurement_manager: ['company:read', 'users:read', 'ops:read', 'procurement:write', 'finance:read', 'approvals:high_impact', 'ai:use'],
-  finance_manager: ['company:read', 'users:read', 'ops:read', 'finance:read', 'approvals:high_impact', 'ai:use'],
+  finance_manager: ['company:read', 'users:read', 'ops:read', 'finance:read', 'finance:write', 'approvals:high_impact', 'ai:use'],
   analyst: ['company:read', 'ops:read', 'finance:read', 'ai:use'],
   read_only: ['company:read', 'ops:read'],
 }
@@ -509,6 +509,69 @@ async function route(method: string, path: string, q: URLSearchParams, body: Rec
     }
     if (M('GET', '/ai/runs')) return [200, A.runs.filter((r) => r.company_id === cid && (r.user_id === uidMe || (PERMS[ctx.user.role] ?? []).includes('audit:read'))).map(runOut).reverse()]
     if (M('GET', /^\/ai\/runs\/[\w-]+$/)) { const r = ownRun(seg[3]); return [200, { ...runOut(r), steps: A.steps.filter((x) => x.run_id === r.id).sort((a, b) => Number(a.seq) - Number(b.seq)) }] }
+  }
+  // ---- Phase 4 (mirrors backend/app/api/phase4.py) ----
+  if (/^\/(vendor-scoring|finance|bom)/.test(path)) {
+    const cid = ctx.company!.id, perms = PERMS[ctx.user.role] ?? [], has = (...p: string[]) => p.some((x) => perms.includes(x))
+    const P = (S.p4 ??= { weights: {}, finance: {}, scenarios: [], bom: [] }) as { weights: Rec; finance: Rec; scenarios: Rec[]; bom: Rec[] }
+    const DW = { cost: 25, quality: 20, reliability: 20, lead_time: 15, financial: 10, risk: 10 }
+    const DF = { carrying_cost_pct: 20, revenue_per_day: null, gross_margin_pct: null, downtime_cost_per_day: null }
+    if (M('GET', '/vendor-scoring/weights')) { need(ctx, 'ops:read'); const w = P.weights[cid] as Rec | undefined; return [200, { weights: w ?? DW, is_default: !w, defaults: DW, updated_at: null }] }
+    if (M('PUT', '/vendor-scoring/weights')) {
+      if (!has('company:update', 'procurement:write')) err(403, 'Missing permission')
+      const keys = Object.keys(DW); only(body, keys)
+      for (const k of keys) { const v = Number(body[k]); if (!Number.isFinite(v) || v < 0 || v > 100) v422(k, 'must be 0–100') }
+      const total = keys.reduce((a, k) => a + Number(body[k]), 0)
+      if (Math.abs(total - 100) > 0.001) v422('weights', `Value error, Weights must total 100% (currently ${total}%)`)
+      P.weights[cid] = Object.fromEntries(keys.map((k) => [k, Number(body[k])]))
+      audit({ action: 'vendor_weights.updated', company_id: cid, actor_user_id: ctx.user.id, details: P.weights[cid] as Rec })
+      return [200, { weights: P.weights[cid], is_default: false, defaults: DW, updated_at: nowIso() }]
+    }
+    if (M('GET', '/finance/settings')) { need(ctx, 'finance:read'); const f = P.finance[cid] as Rec | undefined; return [200, { settings: { ...DF, ...(f ?? {}) }, is_default: !f }] }
+    if (M('PUT', '/finance/settings')) {
+      need(ctx, 'finance:write'); only(body, Object.keys(DF))
+      const c = numIn(body, 0, 'carrying_cost_pct', 0, 100, true)
+      P.finance[cid] = { carrying_cost_pct: c, revenue_per_day: numIn(body, 0, 'revenue_per_day', 0), gross_margin_pct: numIn(body, 0, 'gross_margin_pct', -100, 100), downtime_cost_per_day: numIn(body, 0, 'downtime_cost_per_day', 0) }
+      audit({ action: 'finance_settings.updated', company_id: cid, actor_user_id: ctx.user.id }); return [200, { settings: P.finance[cid], is_default: false }]
+    }
+    if (M('GET', '/finance/scenarios')) { need(ctx, 'finance:read'); return [200, P.scenarios.filter((x) => x.company_id === cid).reverse()] }
+    if (M('POST', '/finance/scenarios')) {
+      if (!(has('finance:write') || (body.kind === 'vendor_scoring' && has('procurement:write')))) err(403, 'Missing permission')
+      if (!['disruption_impact', 'mitigation_roi', 'holding_cost', 'vendor_scoring'].includes(body.kind as string)) v422('kind', 'invalid kind')
+      const sc = { id: uid(), company_id: cid, name: str(body, 'name', 2, 160), kind: body.kind, inputs: body.inputs ?? {}, results: body.results ?? {}, notes: body.notes ?? null, created_by: ctx.user.id, created_at: nowIso() }
+      P.scenarios.push(sc); audit({ action: 'scenario.saved', company_id: cid, actor_user_id: ctx.user.id, entity_type: 'financial_scenario', entity_id: sc.id, details: { name: sc.name, kind: sc.kind } })
+      return [201, sc]
+    }
+    if (M('DELETE', /^\/finance\/scenarios\/[\w-]+$/)) {
+      if (!has('finance:write', 'procurement:write')) err(403, 'Missing permission')
+      const id = path.split('/')[3], sc = P.scenarios.find((x) => x.id === id && x.company_id === cid); if (!sc) err(404, 'Not found')
+      P.scenarios = P.scenarios.filter((x) => x !== sc); audit({ action: 'scenario.deleted', company_id: cid, actor_user_id: ctx.user.id, entity_id: id }); return [204, null]
+    }
+    const prods = (S.ops.products as Rec[]).filter((x) => x.company_id === cid)
+    const bomOut = (b: Rec) => { const pp = prods.find((x) => x.id === b.parent_product_id), cc = prods.find((x) => x.id === b.component_product_id)
+      return { ...b, parent_sku: pp?.sku ?? null, component_sku: cc?.sku ?? null, component_name: cc?.name ?? null } }
+    if (M('GET', '/bom')) { need(ctx, 'ops:read'); return [200, P.bom.filter((b) => b.company_id === cid).map(bomOut)] }
+    if (M('POST', '/bom/bulk')) {
+      if (!has('ops:write', 'procurement:write')) err(403, 'Missing permission')
+      const rows = (body.rows as Rec[]) ?? []; if (!rows.length || rows.length > 2000) v422('rows', 'Provide 1–2000 rows')
+      const bySku = Object.fromEntries(prods.map((x) => [x.sku, x])), errs: string[] = []
+      rows.forEach((r, k) => { const i = k + 1, q = Number(r.quantity_per_unit), pp = bySku[String(r.parent_sku)], cc = bySku[String(r.component_sku)]
+        if (!(q > 0)) errs.push(`Row ${i}: quantity_per_unit must be greater than 0`)
+        else if (!pp || !cc) errs.push(`Row ${i}: unknown SKU '${!pp ? r.parent_sku : r.component_sku}'`)
+        else if (pp.kind !== 'finished_good') errs.push(`Row ${i}: parent '${pp.sku}' must be a finished_good`)
+        else if (cc.kind === 'finished_good') errs.push(`Row ${i}: component '${cc.sku}' must be a raw_material or component`) })
+      if (errs.length) err(422, errs.slice(0, 10).join('; '))
+      let created = 0, updated = 0
+      for (const r of rows) { const pid = bySku[String(r.parent_sku)].id, cidp = bySku[String(r.component_sku)].id
+        const ex = P.bom.find((b) => b.company_id === cid && b.parent_product_id === pid && b.component_product_id === cidp)
+        if (ex) { ex.quantity_per_unit = Number(r.quantity_per_unit); updated++ } else { P.bom.push({ id: uid(), company_id: cid, parent_product_id: pid, component_product_id: cidp, quantity_per_unit: Number(r.quantity_per_unit) }); created++ } }
+      audit({ action: 'bom.imported', company_id: cid, actor_user_id: ctx.user.id, details: { created, updated } }); return [200, { created, updated }]
+    }
+    if (M('DELETE', /^\/bom\/[\w-]+$/)) {
+      if (!has('ops:write', 'procurement:write')) err(403, 'Missing permission')
+      const id = path.split('/')[2], b = P.bom.find((x) => x.id === id && x.company_id === cid); if (!b) err(404, 'Not found')
+      P.bom = P.bom.filter((x) => x !== b); audit({ action: 'bom.deleted', company_id: cid, actor_user_id: ctx.user.id, entity_id: id }); return [204, null]
+    }
   }
   // ---- Phase 3 imports & deletes (mirror backend/app/api/data_import.py) ----
   const bulk = M('POST', /^\/(suppliers|products|inventory|shipments)\/bulk$/)
