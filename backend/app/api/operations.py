@@ -1,4 +1,4 @@
-"""Read APIs for the operational data the dashboard shows. Uploads/edits arrive in Phase 3."""
+"""Read APIs for the operational data the dashboard shows. Imports and deletes live in data_import.py."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
@@ -22,6 +22,8 @@ def suppliers(ctx: TenantContext = Depends(_ops), db: Session = Depends(get_db))
         "id": s.id, "code": s.code, "name": s.name, "category": s.category, "country": s.country, "city": s.city,
         "on_time_delivery_rate": s.on_time_delivery_rate, "quality_score": s.quality_score,
         "avg_lead_time_days": s.avg_lead_time_days, "annual_spend": s.annual_spend,
+        "financial_stability_score": s.financial_stability_score, "risk_exposure_score": s.risk_exposure_score,
+        "capacity_units_per_month": s.capacity_units_per_month, "moq_units": s.moq_units,
         "is_active": s.is_active, "data_source": s.data_source,
     } for s in rows]
 
@@ -31,7 +33,8 @@ def products(ctx: TenantContext = Depends(_ops), db: Session = Depends(get_db)):
     sup = {s.id: s.name for s in db.scalars(scoped(Supplier, ctx))}
     return [{
         "id": p.id, "sku": p.sku, "name": p.name, "kind": p.kind, "category": p.category, "unit": p.unit,
-        "unit_cost": p.unit_cost, "unit_price": p.unit_price,
+        "unit_cost": p.unit_cost, "unit_price": p.unit_price, "conversion_cost": p.conversion_cost,
+        "primary_supplier_id": p.primary_supplier_id,
         "primary_supplier": sup.get(p.primary_supplier_id), "data_source": p.data_source,
     } for p in db.scalars(scoped(Product, ctx).order_by(Product.kind, Product.sku))]
 
@@ -72,10 +75,10 @@ def shipments(status: str | None = Query(default=None), ctx: TenantContext = Dep
             delay = round((s.current_eta - s.original_eta).total_seconds() / 86400, 1)
         out.append({
             "id": s.id, "reference": s.reference, "direction": s.direction, "supplier": sup.get(s.supplier_id),
-            "product": prods.get(s.product_id), "quantity": s.quantity, "value": s.value, "origin": s.origin,
+            "product": prods.get(s.product_id), "quantity": s.quantity, "value": s.value, "freight_cost": s.freight_cost, "origin": s.origin,
             "origin_country": s.origin_country, "destination": s.destination, "mode": s.mode, "carrier": s.carrier,
             "status": s.status, "departed_at": s.departed_at, "original_eta": s.original_eta,
-            "current_eta": s.current_eta, "delay_days": delay, "data_source": s.data_source,
+            "current_eta": s.current_eta, "delivered_at": s.delivered_at, "delay_days": delay, "data_source": s.data_source,
         })
     return out
 

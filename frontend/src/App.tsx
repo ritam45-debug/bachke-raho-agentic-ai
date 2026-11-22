@@ -15,6 +15,8 @@ import AuditPage from './pages/app/Audit'
 import RiskMapPage from './pages/app/RiskMap'
 import WeatherPage from './pages/app/Weather'
 import ConsultingPage from './pages/app/Consulting'
+import DataImportPage from './pages/app/DataImport'
+import LogisticsPage from './pages/app/Logistics'
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -23,7 +25,6 @@ function Protected({ children }: { children: ReactNode }) {
 }
 
 const PLANNED: { path: string; title: string; phase: number; items: string[] }[] = [
-  { path: 'logistics', title: 'Logistics Analytics', phase: 3, items: ['Route and mode comparison with cost-benefit', 'Freight cost trend monitoring', 'Route reliability scoring', 'Bottleneck detection and alternative routes'] },
   { path: 'finance', title: 'Financial Intelligence', phase: 4, items: ['Procurement, holding and logistics cost analysis', 'Downtime and revenue-loss estimates (labelled as estimates)', 'Break-even, sensitivity and mitigation ROI', 'Financial impact report per disruption'] },
   { path: 'compliance', title: 'Legal & Compliance', phase: 5, items: ['Regulatory update monitoring with sources and effective dates', 'Affected products/shipments and missing documents', 'Facts kept separate from AI interpretation', 'Not a substitute for qualified legal advice'] },
   { path: 'consumer', title: 'Consumer Intelligence', phase: 5, items: ['Consent-based feedback forms and surveys', 'Sentiment and NPS', 'Recurring complaints and quality issues', 'Feedback linked to batches and shipments'] },
@@ -47,6 +48,8 @@ export default function App() {
             <Route path="map" element={<RiskMapPage />} />
             <Route path="weather" element={<WeatherPage />} />
             <Route path="consulting" element={<ConsultingPage />} />
+            <Route path="logistics" element={<LogisticsPage />} />
+            <Route path="import" element={<DataImportPage />} />
             <Route path="disruptions" element={<DisruptionsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="shipments" element={<ShipmentsPage />} />

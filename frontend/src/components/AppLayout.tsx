@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Activity, Bot, Boxes, BrainCircuit, Building2, ClipboardList, CloudSun, Gauge, Globe2, IndianRupee, LogOut, Map,
-  Menu, Moon, PackageSearch, Route, Scale, Ship, Smile, Sun, Truck, X,
+  Menu, Moon, PackageSearch, Route, Scale, Ship, Smile, Sun, Truck, Upload, X,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { titleCase } from '../lib/format'
@@ -14,7 +14,7 @@ export const SECTIONS = [
   { to: '/app/weather', label: 'Weather Forecast', icon: CloudSun },
   { to: '/app/disruptions', label: 'Disruption Log', icon: Globe2 },
   { to: '/app/inventory', label: 'Inventory Intelligence', icon: Boxes },
-  { to: '/app/logistics', label: 'Logistics Analytics', icon: Route, phase: 3 },
+  { to: '/app/logistics', label: 'Logistics Analytics', icon: Route },
   { to: '/app/shipments', label: 'Shipment Tracking', icon: Ship },
   { to: '/app/vendors', label: 'Vendor Performance', icon: Truck },
   { to: '/app/products', label: 'Product Lifecycle', icon: PackageSearch },
@@ -23,6 +23,7 @@ export const SECTIONS = [
   { to: '/app/consumer', label: 'Consumer Intelligence', icon: Smile, phase: 5 },
   { to: '/app/memory', label: 'Organisational Memory', icon: BrainCircuit, phase: 5 },
   { to: '/app/consulting', label: 'AI Consulting Centre', icon: Bot, perm: 'ai:use' },
+  { to: '/app/import', label: 'Data Import', icon: Upload, anyPerm: ['ops:write', 'procurement:write'] },
   { to: '/app/audit', label: 'Audit & Activity', icon: ClipboardList, perm: 'audit:read' },
   { to: '/app/settings', label: 'Company Settings', icon: Building2 },
 ]
@@ -55,7 +56,7 @@ export default function AppLayout() {
   const sidebar = (
     <nav className="flex h-full flex-col gap-0.5 overflow-y-auto p-3">
       <div className="mb-4 px-2 pt-1"><Logo /></div>
-      {SECTIONS.filter((s) => !s.perm || can(s.perm)).map((s) => (
+      {SECTIONS.filter((s) => (!s.perm || can(s.perm)) && (!('anyPerm' in s) || (s.anyPerm as string[]).some((p) => can(p)))).map((s) => (
         <NavLink key={s.to} to={s.to} end={s.end}
           className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${isActive
             ? 'bg-ink-900 font-semibold text-white dark:bg-ink-800' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-ink-800/60'}`}>

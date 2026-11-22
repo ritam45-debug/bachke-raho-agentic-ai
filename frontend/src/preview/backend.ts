@@ -121,6 +121,67 @@ function latestCheck(routeId: unknown): Rec | null {
 }
 const routeOut = (r: Rec) => ({ ...r, latest_check: latestCheck(r.id) })
 
+// ---------- Phase 3 import validation (mirrors the Pydantic row models) ----------
+const n = (v: unknown) => (v === '' || v == null ? null : Number(String(v).replace(/%$/, '')))
+function rowErr(i: number, f: string, m: string): never { return err(422, `Row ${i}: ${f} – ${m}`) }
+function reqStr(r: Rec, i: number, f: string, min = 1): string { const v = String(r[f] ?? '').trim(); if (v.length < min) rowErr(i, f, 'Field required'); return v }
+function numIn(r: Rec, i: number, f: string, lo: number, hi = Infinity, required = false): number | null {
+  const v = n(r[f]); if (v == null) { if (required) rowErr(i, f, 'Field required'); return null }
+  if (!Number.isFinite(v) || v < lo || v > hi) rowErr(i, f, `must be between ${lo} and ${hi}`); return v
+}
+function oneOf(r: Rec, i: number, f: string, opts: string[]): string { const v = String(r[f] ?? '').trim(); if (!opts.includes(v)) rowErr(i, f, `must be one of ${opts.join(', ')}`); return v }
+const dt = (v: unknown) => (v ? new Date(String(v)).toISOString() : null)
+
+function importRows(entity: string, rows: Rec[], cid: string) {
+  const T = (t: string) => (S.ops[t] as Rec[]).filter((x) => x.company_id === cid)
+  let created = 0, updated = 0
+  const upsert = (table: string, match: (x: Rec) => boolean, vals: Rec) => {
+    const ex = T(table).find(match)
+    if (ex) { for (const [k, v] of Object.entries(vals)) if (v != null) ex[k] = v; ex.data_source = 'upload'; updated++ }
+    else { (S.ops[table] as Rec[]).push({ id: uid(), company_id: cid, data_source: 'upload', ...vals }); created++ }
+  }
+  if (entity === 'suppliers') {
+    const parsed = rows.map((r, k) => { const i = k + 1; let otd = n(r.on_time_delivery_rate); if (otd != null && otd > 1) otd = otd / 100
+      if (otd != null && (otd < 0 || otd > 1)) rowErr(i, 'on_time_delivery_rate', 'must be 0–1 or 0–100%')
+      return { code: reqStr(r, i, 'code'), name: reqStr(r, i, 'name', 2), category: reqStr(r, i, 'category'), country: reqStr(r, i, 'country', 2), city: r.city || null,
+        on_time_delivery_rate: otd, quality_score: numIn(r, i, 'quality_score', 0, 100), avg_lead_time_days: numIn(r, i, 'avg_lead_time_days', 0, 730),
+        annual_spend: numIn(r, i, 'annual_spend', 0), financial_stability_score: numIn(r, i, 'financial_stability_score', 0, 100),
+        risk_exposure_score: numIn(r, i, 'risk_exposure_score', 0, 100), capacity_units_per_month: numIn(r, i, 'capacity_units_per_month', 0), moq_units: numIn(r, i, 'moq_units', 0), is_active: true } })
+    parsed.forEach((v) => upsert('suppliers', (x) => x.code === v.code, v))
+  } else if (entity === 'products') {
+    const sup = Object.fromEntries(T('suppliers').map((x) => [x.code, x.id]))
+    const parsed = rows.map((r, k) => { const i = k + 1, code = String(r.primary_supplier_code ?? '').trim()
+      if (code && !sup[code]) err(422, `Unknown supplier code(s): ${code}. Import suppliers first.`)
+      return { sku: reqStr(r, i, 'sku'), name: reqStr(r, i, 'name', 2), kind: oneOf(r, i, 'kind', ['raw_material', 'component', 'finished_good']), category: reqStr(r, i, 'category'),
+        unit: String(r.unit || 'unit'), unit_cost: numIn(r, i, 'unit_cost', 0, Infinity, true), unit_price: numIn(r, i, 'unit_price', 0), conversion_cost: numIn(r, i, 'conversion_cost', 0),
+        primary_supplier_id: code ? sup[code] : null } })
+    parsed.forEach((v) => upsert('products', (x) => x.sku === v.sku, v))
+  } else if (entity === 'inventory') {
+    const prods = Object.fromEntries(T('products').map((x) => [x.sku, x])), sups = Object.fromEntries(T('suppliers').map((x) => [x.id, x]))
+    const locs = Object.fromEntries(S.locations.filter((l) => l.company_id === cid).map((l) => [l.name.toLowerCase(), l]))
+    const parsed = rows.map((r, k) => { const i = k + 1, sku = reqStr(r, i, 'sku'), loc = reqStr(r, i, 'location')
+      if (!prods[sku]) err(422, `Row ${i}: unknown SKU '${sku}'. Import products and add locations first.`)
+      if (!locs[loc.toLowerCase()]) err(422, `Row ${i}: unknown location '${loc}'. Import products and add locations first.`)
+      const d = numIn(r, i, 'avg_daily_demand', 0, Infinity, true)!, sup = sups[prods[sku].primary_supplier_id as string]
+      const lead = numIn(r, i, 'lead_time_days', 0, 730) ?? Number(sup?.avg_lead_time_days ?? 0), ss = numIn(r, i, 'safety_stock', 0) ?? 0
+      return { product_id: prods[sku].id, location_id: locs[loc.toLowerCase()].id, quantity_on_hand: numIn(r, i, 'quantity_on_hand', 0, Infinity, true),
+        avg_daily_demand: d, lead_time_days: lead, safety_stock: ss, reorder_point: numIn(r, i, 'reorder_point', 0) ?? d * lead + ss } })
+    parsed.forEach((v) => upsert('inventory', (x) => x.product_id === v.product_id && x.location_id === v.location_id, v))
+  } else {
+    const sup = Object.fromEntries(T('suppliers').map((x) => [x.code, x.id])), prods = Object.fromEntries(T('products').map((x) => [x.sku, x.id]))
+    const parsed = rows.map((r, k) => { const i = k + 1, sc = String(r.supplier_code ?? '').trim(), sku = String(r.sku ?? '').trim()
+      if (sc && !sup[sc]) err(422, `Row ${i}: unknown supplier '${sc}'`); if (sku && !prods[sku]) err(422, `Row ${i}: unknown SKU '${sku}'`)
+      const oe = dt(r.original_eta)
+      return { reference: reqStr(r, i, 'reference'), direction: oneOf(r, i, 'direction', ['inbound', 'outbound']), supplier_id: sc ? sup[sc] : null, product_id: sku ? prods[sku] : null,
+        quantity: numIn(r, i, 'quantity', 0, Infinity, true), value: numIn(r, i, 'value', 0, Infinity, true), freight_cost: numIn(r, i, 'freight_cost', 0),
+        origin: reqStr(r, i, 'origin'), origin_country: reqStr(r, i, 'origin_country', 2), destination: reqStr(r, i, 'destination'), mode: oneOf(r, i, 'mode', ['sea', 'air', 'road', 'rail']),
+        carrier: r.carrier || null, status: oneOf(r, i, 'status', ['planned', 'in_transit', 'delayed', 'delivered', 'cancelled']),
+        departed_at: dt(r.departed_at), original_eta: oe, current_eta: dt(r.current_eta) ?? oe, delivered_at: dt(r.delivered_at) } })
+    parsed.forEach((v) => upsert('shipments', (x) => x.reference === v.reference, v))
+  }
+  return { created, updated }
+}
+
 // ---------- AI pricing (mirrors backend PRICES; USD per million tokens) ----------
 const AI_PRICES: Record<string, { label: string; in: number; out: number; long_in?: number; long_out?: number; long_from?: number }> = {
   'claude-sonnet-5-5': { label: 'Claude Sonnet 5.5', in: 2, out: 10 },
@@ -448,6 +509,26 @@ async function route(method: string, path: string, q: URLSearchParams, body: Rec
     }
     if (M('GET', '/ai/runs')) return [200, A.runs.filter((r) => r.company_id === cid && (r.user_id === uidMe || (PERMS[ctx.user.role] ?? []).includes('audit:read'))).map(runOut).reverse()]
     if (M('GET', /^\/ai\/runs\/[\w-]+$/)) { const r = ownRun(seg[3]); return [200, { ...runOut(r), steps: A.steps.filter((x) => x.run_id === r.id).sort((a, b) => Number(a.seq) - Number(b.seq)) }] }
+  }
+  // ---- Phase 3 imports & deletes (mirror backend/app/api/data_import.py) ----
+  const bulk = M('POST', /^\/(suppliers|products|inventory|shipments)\/bulk$/)
+  if (bulk || M('DELETE', /^\/(suppliers|products|inventory|shipments)\/[\w-]+$/)) {
+    const entity = path.split('/')[1], perms = PERMS[ctx.user.role] ?? []
+    const allowed = ['suppliers', 'products'].includes(entity) ? perms.includes('ops:write') || perms.includes('procurement:write') : perms.includes('ops:write')
+    if (!allowed) err(403, 'Missing permission')
+    const table = entity === 'inventory' ? 'inventory' : entity
+    const cid = ctx.company!.id
+    if (!bulk) {
+      const id = path.split('/')[2], row = (S.ops[table] as Rec[]).find((x) => x.id === id && x.company_id === cid)
+      if (!row) err(404, 'Not found')
+      S.ops[table] = (S.ops[table] as Rec[]).filter((x) => x !== row)
+      audit({ action: `${entity}.deleted`, company_id: cid, actor_user_id: ctx.user.id, entity_type: entity, entity_id: id }); return [204, null]
+    }
+    const rows = (body.rows as Rec[]) ?? []
+    if (!rows.length || rows.length > 2000) v422('rows', 'Provide 1–2000 rows')
+    const res = importRows(entity, rows, cid)
+    audit({ action: `${entity === 'inventory' ? 'inventory' : entity.slice(0, -1)}.imported`, company_id: cid, actor_user_id: ctx.user.id, entity_type: entity, details: res })
+    return [200, res]
   }
   // ---- operations & dashboard ----
   if (M('GET', '/dashboard/overview')) { need(ctx, 'ops:read'); return [200, overview(ctx)] }

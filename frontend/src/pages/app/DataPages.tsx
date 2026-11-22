@@ -45,7 +45,7 @@ function DataPage({ path, title, subtitle, cols, search, filterKey, filterLabel,
       {loading ? <Loading /> : error ? <ErrorBox message={error} /> : (
         <>
           <Toolbar {...t} label={filterLabel} count={t.out.length} onExport={() => dl(file, t.out)} />
-          <Table rows={t.out} cols={cols} empty="No records in this workspace yet. Data upload arrives in Phase 3." />
+          <Table rows={t.out} cols={cols} empty="No records yet. Use Data Import (left menu) to upload a CSV." />
         </>
       )}
       {after && <div className="mt-6">{after}</div>}

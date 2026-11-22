@@ -25,6 +25,11 @@ class Supplier(TenantMixin, Base):
     quality_score: Mapped[float | None] = mapped_column(Float)          # 0..100
     avg_lead_time_days: Mapped[float | None] = mapped_column(Float)
     annual_spend: Mapped[float | None] = mapped_column(Float)
+    # Phase 4 vendor-scoring inputs (0-100 scores are company assessments, not external ratings)
+    financial_stability_score: Mapped[float | None] = mapped_column(Float)
+    risk_exposure_score: Mapped[float | None] = mapped_column(Float)   # 0 = no exposure, 100 = extreme
+    capacity_units_per_month: Mapped[float | None] = mapped_column(Float)
+    moq_units: Mapped[float | None] = mapped_column(Float)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     data_source: Mapped[str] = mapped_column(String(20), default="manual", nullable=False)
 
@@ -42,6 +47,7 @@ class Product(TenantMixin, Base):
     unit: Mapped[str] = mapped_column(String(20), default="unit", nullable=False)
     unit_cost: Mapped[float] = mapped_column(Float, nullable=False)
     unit_price: Mapped[float | None] = mapped_column(Float)
+    conversion_cost: Mapped[float | None] = mapped_column(Float)  # labour + overhead per unit (finished goods)
     primary_supplier_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("suppliers.id", ondelete="SET NULL"))
     data_source: Mapped[str] = mapped_column(String(20), default="manual", nullable=False)
 
@@ -84,6 +90,7 @@ class Shipment(TenantMixin, Base):
     product_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("products.id", ondelete="SET NULL"), index=True)
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     value: Mapped[float] = mapped_column(Float, nullable=False)
+    freight_cost: Mapped[float | None] = mapped_column(Float)
     origin: Mapped[str] = mapped_column(String(160), nullable=False)
     origin_country: Mapped[str] = mapped_column(String(80), nullable=False)
     destination: Mapped[str] = mapped_column(String(160), nullable=False)

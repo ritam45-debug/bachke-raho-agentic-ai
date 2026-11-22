@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import ai, audit_admin, auth, company, dashboard, operations, routes_api, users
+from app.api import ai, audit_admin, auth, company, dashboard, data_import, operations, routes_api, users
 from app.core.config import get_settings
 from app.database.session import init_db
 
@@ -67,5 +67,5 @@ def health():
             "ai_enabled": bool(settings.anthropic_api_key), "environment": settings.environment}
 
 
-for r in (auth.router, company.router, users.router, dashboard.router, operations.router, routes_api.router, ai.router, audit_admin.router):
+for r in (auth.router, company.router, users.router, dashboard.router, operations.router, routes_api.router, ai.router, data_import.router, audit_admin.router):
     app.include_router(r, prefix=settings.api_prefix)
