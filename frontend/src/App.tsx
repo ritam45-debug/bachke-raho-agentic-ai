@@ -14,6 +14,7 @@ import SettingsPage from './pages/app/Settings'
 import AuditPage from './pages/app/Audit'
 import RiskMapPage from './pages/app/RiskMap'
 import WeatherPage from './pages/app/Weather'
+import ConsultingPage from './pages/app/Consulting'
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -27,7 +28,6 @@ const PLANNED: { path: string; title: string; phase: number; items: string[] }[]
   { path: 'compliance', title: 'Legal & Compliance', phase: 5, items: ['Regulatory update monitoring with sources and effective dates', 'Affected products/shipments and missing documents', 'Facts kept separate from AI interpretation', 'Not a substitute for qualified legal advice'] },
   { path: 'consumer', title: 'Consumer Intelligence', phase: 5, items: ['Consent-based feedback forms and surveys', 'Sentiment and NPS', 'Recurring complaints and quality issues', 'Feedback linked to batches and shipments'] },
   { path: 'memory', title: 'Organisational Memory', phase: 5, items: ['Contracts, POs, policies and past decisions', 'Permission-aware document retrieval (pgvector)', 'History pulled in before every major recommendation', 'Admin review, export and deletion'] },
-  { path: 'consulting', title: 'AI Consulting Centre', phase: 2, items: ['Claude-powered conversational assistant', 'Central orchestrator with stateful agent workflows', 'Explained recommendations and strategy comparison', 'Agent execution logs'] },
 ]
 
 // The artifact frame only passes plain #names, so the preview keeps routes in memory.
@@ -46,6 +46,7 @@ export default function App() {
             <Route index element={<OverviewPage />} />
             <Route path="map" element={<RiskMapPage />} />
             <Route path="weather" element={<WeatherPage />} />
+            <Route path="consulting" element={<ConsultingPage />} />
             <Route path="disruptions" element={<DisruptionsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="shipments" element={<ShipmentsPage />} />

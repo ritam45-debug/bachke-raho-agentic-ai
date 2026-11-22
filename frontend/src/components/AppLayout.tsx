@@ -22,7 +22,7 @@ export const SECTIONS = [
   { to: '/app/compliance', label: 'Legal & Compliance', icon: Scale, phase: 5 },
   { to: '/app/consumer', label: 'Consumer Intelligence', icon: Smile, phase: 5 },
   { to: '/app/memory', label: 'Organisational Memory', icon: BrainCircuit, phase: 5 },
-  { to: '/app/consulting', label: 'AI Consulting Centre', icon: Bot, phase: 2 },
+  { to: '/app/consulting', label: 'AI Consulting Centre', icon: Bot, perm: 'ai:use' },
   { to: '/app/audit', label: 'Audit & Activity', icon: ClipboardList, perm: 'audit:read' },
   { to: '/app/settings', label: 'Company Settings', icon: Building2 },
 ]
@@ -66,7 +66,7 @@ export default function AppLayout() {
       ))}
       <div className="mt-auto rounded-lg border border-slate-200 p-3 text-xs dark:border-ink-700">
         <div className="flex items-center gap-1.5 font-semibold"><Activity size={13} className="text-calm" /> Agent layer</div>
-        <p className="mt-1 text-slate-500 dark:text-slate-400">Live risk checks use public weather and hazard feeds. AI agents switch on in Phase 2.</p>
+        <p className="mt-1 text-slate-500 dark:text-slate-400">Route Risk Analyst available in the AI Consulting Centre. Live checks use public weather and hazard feeds.</p>
       </div>
     </nav>
   )

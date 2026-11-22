@@ -13,7 +13,7 @@ from app.services.tenant_repo import scoped
 
 router = APIRouter(prefix="/company", tags=["company"])
 
-_COMPANY_FIELDS = {"name", "industry", "company_size", "headquarters", "ai_external_processing", "data_retention_days"}
+_COMPANY_FIELDS = {"name", "industry", "company_size", "headquarters", "ai_external_processing", "ai_monthly_budget_usd", "data_retention_days"}
 _PROFILE_FIELDS = {"description", "product_categories", "website", "currency"}
 
 
@@ -24,7 +24,7 @@ def _out(db: Session, ctx: TenantContext) -> CompanyOut:
     return CompanyOut(
         id=c.id, name=c.name, slug=c.slug, industry=c.industry, company_size=c.company_size,
         headquarters=c.headquarters, country=c.country, registration_number=c.registration_number,
-        status=c.status, is_demo=c.is_demo, ai_external_processing=c.ai_external_processing,
+        status=c.status, is_demo=c.is_demo, ai_external_processing=c.ai_external_processing, ai_monthly_budget_usd=c.ai_monthly_budget_usd,
         data_retention_days=c.data_retention_days, created_at=c.created_at,
         description=p.description if p else None, product_categories=(p.product_categories if p else []) or [],
         admin_contact_name=p.admin_contact_name if p else None,

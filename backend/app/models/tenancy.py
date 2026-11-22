@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.session import Base
@@ -26,6 +26,8 @@ class Company(Base):
     # Tenant-level consent before data may be sent to an external AI provider (Phase 2+).
     ai_external_processing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     data_retention_days: Mapped[int] = mapped_column(Integer, default=730, nullable=False)
+    # Monthly ceiling on recorded AI spend (USD). Runs are refused once the month's recorded cost reaches it.
+    ai_monthly_budget_usd: Mapped[float] = mapped_column(Float, default=10.0, server_default="10", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     profile: Mapped[CompanyProfile] = relationship(back_populates="company", uselist=False)

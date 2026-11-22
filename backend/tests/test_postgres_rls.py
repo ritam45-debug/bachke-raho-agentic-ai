@@ -45,3 +45,18 @@ def test_audit_log_is_append_only(client):
     register(client)
     with SessionLocal() as db, pytest.raises(Exception, match="append-only"):
         db.execute(text("UPDATE audit_logs SET action = 'tampered'"))
+
+
+def test_ai_tables_are_rls_protected(client):
+    a, _ = register(client)
+    b, _ = register(client)
+    ha = auth(a)
+    client.patch(f"{API}/company", headers=ha, json={"ai_external_processing": True})
+    conv = client.post(f"{API}/ai/conversations", headers=ha, json={"title": "t"}).json()
+    run = client.post(f"{API}/ai/runs", headers=ha, json={"agent": "route_risk_analyst", "model": "claude-sonnet-5-5", "conversation_id": conv["id"]}).json()
+    client.post(f"{API}/ai/runs/{run['id']}/steps", headers=ha, json={"seq": 0, "kind": "final"})
+    b_cid = client.get(f"{API}/auth/me", headers=auth(b)).json()["company_id"]
+    with SessionLocal() as db:
+        set_tenant_guc(db, b_cid)
+        for t in ("ai_conversations", "ai_messages", "agent_runs", "agent_steps"):
+            assert db.execute(text(f"SELECT count(*) FROM {t}")).scalar() == 0, t

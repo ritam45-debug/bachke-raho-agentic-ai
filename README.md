@@ -5,7 +5,8 @@
 > **Status: Phase 1 complete, plus the live Route & Risk Map and Weather Forecast tools.** Multi-company registration,
 > secure auth, role-based access, two-layer tenant isolation (app + PostgreSQL RLS), audit trail, an executive dashboard,
 > and live route risk checks from public weather, sea-state, earthquake and natural-event data.
-> AI agents start in Phase 2. See [documentation/ROADMAP.md](documentation/ROADMAP.md) and [documentation/LIVE_DATA.md](documentation/LIVE_DATA.md).
+> **Phase 2:** the AI Consulting Centre with the Route Risk Analyst agent (bring-your-own Anthropic key). See
+> [documentation/AI.md](documentation/AI.md), [ROADMAP.md](documentation/ROADMAP.md) and [LIVE_DATA.md](documentation/LIVE_DATA.md).
 
 **Live preview:** https://ritam45-debug.github.io/bachke-raho-agentic-ai/
 
@@ -46,7 +47,7 @@ Row-Level Security is enforced.
 ```bash
 cd backend && pytest -q                         # SQLite (24 tests, 3 Postgres-only skipped)
 # Against Postgres with RLS (as CI does): see .github/workflows/ci.yml
-cd frontend && npm run build                    # type-check + production build
+cd frontend && npm test && npm run build        # unit tests, type-check + production build
 ```
 
 ## What's in Phase 1
@@ -72,7 +73,7 @@ backend/app/        api · security · models · schemas · services · analytic
 backend/migrations/ Alembic (0001 schema, 0002 Postgres RLS + append-only audit)
 backend/tests/      auth, tenant isolation, RBAC, formulas, Postgres RLS
 frontend/src/       pages, components, lib (api client, auth)
-documentation/      ARCHITECTURE · ROADMAP · SECURITY · ASSUMPTIONS · LIVE_DATA
+documentation/      ARCHITECTURE · ROADMAP · SECURITY · ASSUMPTIONS · LIVE_DATA · AI
 scripts/            super-admin creation, DB init
 ```
 

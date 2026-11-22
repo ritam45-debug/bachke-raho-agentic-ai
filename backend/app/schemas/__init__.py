@@ -122,6 +122,7 @@ class CompanyOut(BaseModel):
     status: str
     is_demo: bool
     ai_external_processing: bool
+    ai_monthly_budget_usd: float
     data_retention_days: int
     created_at: datetime
     description: str | None
@@ -144,6 +145,7 @@ class CompanyUpdate(_Strict):
     website: str | None = Field(default=None, max_length=200)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     ai_external_processing: bool | None = None
+    ai_monthly_budget_usd: float | None = Field(default=None, ge=0, le=100000)
     data_retention_days: int | None = Field(default=None, ge=30, le=3650)
 
     @field_validator("currency")

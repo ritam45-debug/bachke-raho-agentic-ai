@@ -141,6 +141,9 @@ Nothing that commits money or a contract runs automatically. The executor expose
 
 ## 4. AI gateway (Phase 2)
 
+> **As built:** the live site is static, so agents run in the browser with each user's own key and a TypeScript
+> orchestrator; the server enforces consent and budget, prices usage and stores the trace. Details and limits: [AI.md](AI.md).
+
 All Claude calls go through one module, `integrations/ai_gateway.py`:
 
 1. **Consent check:** refuses if the tenant's `ai_external_processing` is false.

@@ -2,24 +2,24 @@
 // It mirrors the real API's routes, validation and rules so the same React app runs unchanged,
 // but it is NOT a security boundary: everything lives in this viewer's browser storage.
 type Rec = Record<string, unknown>
-interface Company { id: string; name: string; slug: string; industry: string; company_size: string; headquarters: string; country: string | null; registration_number: string | null; status: string; is_demo: boolean; ai_external_processing: boolean; data_retention_days: number; created_at: string }
+interface Company { id: string; name: string; slug: string; industry: string; company_size: string; headquarters: string; country: string | null; registration_number: string | null; status: string; is_demo: boolean; ai_external_processing: boolean; ai_monthly_budget_usd: number; data_retention_days: number; created_at: string }
 interface Profile { company_id: string; description: string | null; product_categories: string[]; admin_contact_name: string | null; admin_contact_email: string | null; admin_contact_phone: string | null; website: string | null; currency: string }
 interface Loc { id: string; company_id: string; name: string; kind: string; city: string | null; country: string | null; latitude: number | null; longitude: number | null }
 interface User { id: string; company_id: string; email: string; full_name: string; job_title: string | null; role: string; pw: string; salt: string; is_active: boolean; failed: number; locked_until: number | null; last_login_at: string | null; created_at: string }
 interface Session { id: string; user_id: string; access: string; refresh: string; access_exp: number; refresh_exp: number; revoked: boolean }
 interface Audit { id: string; company_id: string | null; actor_user_id: string | null; actor_type: string; action: string; entity_type: string | null; entity_id: string | null; outcome: string; ip_address: string | null; details: Rec; created_at: string }
-interface State { v: 2; companies: Company[]; profiles: Profile[]; locations: Loc[]; users: User[]; sessions: Session[]; audit: Audit[]; ops: Record<string, Rec[]>; routes: Rec[]; checks: Rec[] }
+interface State { v: 2; companies: Company[]; profiles: Profile[]; locations: Loc[]; users: User[]; sessions: Session[]; audit: Audit[]; ops: Record<string, Rec[]>; routes: Rec[]; checks: Rec[]; ai?: { convs: Rec[]; msgs: Rec[]; runs: Rec[]; steps: Rec[] } }
 
 const KEY = 'bra.preview.state.v2' // v1 held the removed Aureon demo
 const ACCESS_MS = 30 * 60e3, REFRESH_MS = 7 * 864e5, MAX_FAIL = 5, LOCK_MS = 15 * 60e3
 const ROLES = ['company_admin', 'supply_chain_manager', 'procurement_manager', 'finance_manager', 'analyst', 'read_only']
-const ALL = ['company:read', 'company:update', 'users:read', 'users:manage', 'ops:read', 'ops:write', 'procurement:write', 'finance:read', 'audit:read', 'approvals:high_impact']
+const ALL = ['company:read', 'company:update', 'users:read', 'users:manage', 'ops:read', 'ops:write', 'procurement:write', 'finance:read', 'audit:read', 'approvals:high_impact', 'ai:use']
 const PERMS: Record<string, string[]> = {
   company_admin: ALL,
-  supply_chain_manager: ['company:read', 'users:read', 'ops:read', 'ops:write', 'finance:read', 'approvals:high_impact'],
-  procurement_manager: ['company:read', 'users:read', 'ops:read', 'procurement:write', 'finance:read', 'approvals:high_impact'],
-  finance_manager: ['company:read', 'users:read', 'ops:read', 'finance:read', 'approvals:high_impact'],
-  analyst: ['company:read', 'ops:read', 'finance:read'],
+  supply_chain_manager: ['company:read', 'users:read', 'ops:read', 'ops:write', 'finance:read', 'approvals:high_impact', 'ai:use'],
+  procurement_manager: ['company:read', 'users:read', 'ops:read', 'procurement:write', 'finance:read', 'approvals:high_impact', 'ai:use'],
+  finance_manager: ['company:read', 'users:read', 'ops:read', 'finance:read', 'approvals:high_impact', 'ai:use'],
+  analyst: ['company:read', 'ops:read', 'finance:read', 'ai:use'],
   read_only: ['company:read', 'ops:read'],
 }
 
@@ -121,6 +121,16 @@ function latestCheck(routeId: unknown): Rec | null {
 }
 const routeOut = (r: Rec) => ({ ...r, latest_check: latestCheck(r.id) })
 
+// ---------- AI pricing (mirrors backend PRICES; USD per million tokens) ----------
+const AI_PRICES: Record<string, { label: string; in: number; out: number; long_in?: number; long_out?: number; long_from?: number }> = {
+  'claude-sonnet-5-5': { label: 'Claude Sonnet 5.5', in: 2, out: 10 },
+  'claude-haiku-5-5': { label: 'Claude Haiku 5.5', in: 0.1, out: 0.5, long_in: 0.5, long_out: 2.5, long_from: 100000 },
+}
+function aiCost(model: string, i: number, o: number) {
+  const p = AI_PRICES[model]; const long = p.long_from != null && i > p.long_from
+  return (i * (long ? p.long_in! : p.in) + o * (long ? p.long_out! : p.out)) / 1e6
+}
+
 // ---------- analytics (mirrors backend/app/analytics/inventory_metrics.py) ----------
 const cover = (q: number, d: number) => (d > 0 ? q / d : null)
 function stockStatus(q: number, rop: number, ss: number, d: number, lt: number) {
@@ -211,7 +221,7 @@ async function route(method: string, path: string, q: URLSearchParams, body: Rec
     if (S.users.some((u) => u.email === em)) err(409, 'An account with this email already exists')
     const base = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'company'
     let slug = base, n = 1; while (S.companies.some((c) => c.slug === slug)) slug = `${base}-${++n}`
-    const c: Company = { id: uid(), name, slug, industry, company_size: body.company_size as string, headquarters: hq, country: (body.country as string) || null, registration_number: (body.registration_number as string) || null, status: 'active', is_demo: false, ai_external_processing: false, data_retention_days: 730, created_at: nowIso() }
+    const c: Company = { id: uid(), name, slug, industry, company_size: body.company_size as string, headquarters: hq, country: (body.country as string) || null, registration_number: (body.registration_number as string) || null, status: 'active', is_demo: false, ai_external_processing: false, ai_monthly_budget_usd: 10, data_retention_days: 730, created_at: nowIso() }
     S.companies.push(c)
     S.profiles.push({ company_id: c.id, description: null, product_categories: ((body.product_categories as string[]) ?? []).map((x) => x.trim()).filter(Boolean), admin_contact_name: full, admin_contact_email: em, admin_contact_phone: (body.admin_phone as string) || null, website: null, currency: 'INR' })
     S.locations.push({ id: uid(), company_id: c.id, name: `${name} HQ`, kind: 'headquarters', city: hq, country: c.country, latitude: null, longitude: null })
@@ -257,7 +267,8 @@ async function route(method: string, path: string, q: URLSearchParams, body: Rec
   if (M('GET', '/company')) { need(ctx, 'company:read'); return [200, companyOut(ctx)] }
   if (M('PATCH', '/company')) {
     need(ctx, 'company:update'); noDemo(ctx)
-    only(body, ['name', 'industry', 'company_size', 'headquarters', 'description', 'product_categories', 'website', 'currency', 'ai_external_processing', 'data_retention_days'])
+    only(body, ['name', 'industry', 'company_size', 'headquarters', 'description', 'product_categories', 'website', 'currency', 'ai_external_processing', 'ai_monthly_budget_usd', 'data_retention_days'])
+    if (body.ai_monthly_budget_usd != null && (Number(body.ai_monthly_budget_usd) < 0 || Number(body.ai_monthly_budget_usd) > 100000)) v422('ai_monthly_budget_usd', 'Must be between 0 and 100000')
     if (body.currency != null && !/^[A-Z]{3}$/.test(String(body.currency))) v422('currency', 'Value error, Currency must be an ISO 4217 code, e.g. INR')
     if (body.data_retention_days != null && ((body.data_retention_days as number) < 30 || (body.data_retention_days as number) > 3650)) v422('data_retention_days', 'Must be between 30 and 3650')
     for (const k of ['name', 'industry', 'headquarters']) if (k in body) str(body, k, 2, 200)
@@ -372,6 +383,71 @@ async function route(method: string, path: string, q: URLSearchParams, body: Rec
     need(ctx, 'ops:read')
     const r = ownRoute(ctx, path.split('/')[2])
     return [200, S.checks.filter((c) => c.route_id === r.id).sort((a, b) => String(b.checked_at).localeCompare(String(a.checked_at))).slice(0, 50)]
+  }
+  // ---- AI (mirrors backend/app/api/ai.py) ----
+  if (path.startsWith('/ai/')) {
+    need(ctx, 'ai:use')
+    const A = (S.ai ??= { convs: [], msgs: [], runs: [], steps: [] })
+    const cid = ctx.company!.id, uidMe = ctx.user.id
+    const ownConv = (id: unknown) => { const c = A.convs.find((x) => x.id === id && x.company_id === cid && x.user_id === uidMe); if (!c) err(404, 'Conversation not found'); return c! }
+    const ownRun = (id: unknown) => { const r = A.runs.find((x) => x.id === id && x.company_id === cid); if (!r || (r.user_id !== uidMe && !(PERMS[ctx.user.role] ?? []).includes('audit:read'))) err(404, 'Run not found'); return r! }
+    const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0)
+    const spent = () => A.runs.filter((r) => r.company_id === cid && String(r.started_at) >= monthStart.toISOString()).reduce((a, r) => a + Number(r.cost_usd), 0)
+    const runOut = (r: Rec) => Object.fromEntries(['id', 'conversation_id', 'agent', 'model', 'autonomy_level', 'status', 'input_tokens', 'output_tokens', 'cost_usd', 'tool_calls', 'error', 'started_at', 'finished_at'].map((k) => [k, r[k]]))
+    const seg = path.split('/')
+    if (M('GET', '/ai/status')) {
+      const sp = spent(), budget = ctx.company!.ai_monthly_budget_usd ?? 10
+      return [200, { consent: ctx.company!.ai_external_processing, budget_usd: budget, spent_month_usd: sp, remaining_usd: Math.max(0, budget - sp),
+        runs_month: A.runs.filter((r) => r.company_id === cid && String(r.started_at) >= monthStart.toISOString()).length,
+        models: Object.entries(AI_PRICES).map(([id, p]) => ({ id, label: p.label, input_per_mtok: p.in, output_per_mtok: p.out })),
+        agents: [{ id: 'route_risk_analyst', label: 'Route Risk Analyst' }, { id: 'orchestrator', label: 'Orchestrator' }] }]
+    }
+    if (M('GET', '/ai/conversations')) return [200, A.convs.filter((c) => c.company_id === cid && c.user_id === uidMe).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))]
+    if (M('POST', '/ai/conversations')) { const c = { id: uid(), company_id: cid, user_id: uidMe, title: str(body, 'title', 1, 200)!, created_at: nowIso(), updated_at: nowIso() }; A.convs.push(c); return [201, c] }
+    if (M('GET', /^\/ai\/conversations\/[\w-]+$/)) { const c = ownConv(seg[3]); return [200, { ...c, messages: A.msgs.filter((m) => m.conversation_id === c.id) }] }
+    if (M('DELETE', /^\/ai\/conversations\/[\w-]+$/)) {
+      const c = ownConv(seg[3]); A.convs = A.convs.filter((x) => x !== c); A.msgs = A.msgs.filter((m) => m.conversation_id !== c.id)
+      audit({ action: 'ai.conversation_deleted', company_id: cid, actor_user_id: uidMe, entity_type: 'ai_conversation', entity_id: c.id as string }); return [204, null]
+    }
+    if (M('POST', /^\/ai\/conversations\/[\w-]+\/messages$/)) {
+      const c = ownConv(seg[3]); if (!['user', 'assistant'].includes(body.role as string)) v422('role', 'user or assistant')
+      if (body.run_id) ownRun(body.run_id)
+      const m = { id: uid(), company_id: cid, conversation_id: c.id, role: body.role, content: str(body, 'content', 1, 40000), run_id: body.run_id ?? null, created_at: nowIso() }
+      A.msgs.push(m); c.updated_at = nowIso(); return [201, m]
+    }
+    if (M('POST', '/ai/runs')) {
+      if (!AI_PRICES[body.model as string]) err(422, `Unsupported model. Use one of: ${Object.keys(AI_PRICES).join(', ')}`)
+      if (!['route_risk_analyst', 'orchestrator'].includes(body.agent as string)) err(422, 'Unknown agent')
+      if (![undefined, 1, 2].includes(body.autonomy_level as number)) v422('autonomy_level', 'Must be 1 or 2')
+      if (!ctx.company!.ai_external_processing) { audit({ action: 'ai.run_blocked', company_id: cid, actor_user_id: uidMe, outcome: 'denied', details: { reason: 'consent_off' } }); save()
+        err(403, "AI is switched off for this company. An administrator can enable 'Allow external AI processing' in Company Settings.") }
+      const sp = spent(), budget = ctx.company!.ai_monthly_budget_usd ?? 10
+      if (sp >= budget) { audit({ action: 'ai.run_blocked', company_id: cid, actor_user_id: uidMe, outcome: 'denied', details: { reason: 'budget', spent_usd: sp } }); save()
+        err(429, `This month's AI budget ($${budget.toFixed(2)}) has been reached. An administrator can raise it in Company Settings.`) }
+      if (body.conversation_id) ownConv(body.conversation_id)
+      const r = { id: uid(), company_id: cid, conversation_id: body.conversation_id ?? null, user_id: uidMe, agent: body.agent, model: body.model, autonomy_level: body.autonomy_level ?? 2,
+        status: 'running', input_tokens: 0, output_tokens: 0, cost_usd: 0, tool_calls: 0, error: null, started_at: nowIso(), finished_at: null }
+      A.runs.push(r)
+      audit({ action: 'ai.run_started', company_id: cid, actor_user_id: uidMe, actor_type: 'agent', entity_type: 'agent_run', entity_id: r.id, details: { agent: r.agent, model: r.model } })
+      return [201, { ...runOut(r), remaining_usd: budget - sp }]
+    }
+    if (M('POST', /^\/ai\/runs\/[\w-]+\/steps$/)) {
+      const r = ownRun(seg[3]); if (r.user_id !== uidMe || r.status !== 'running') err(409, 'Steps can only be added to your own running run')
+      if (A.steps.some((x) => x.run_id === r.id && x.seq === body.seq)) err(409, `Step ${body.seq} already recorded`)
+      let payload = (body.payload as Rec) ?? {}; const raw = JSON.stringify(payload); if (raw.length > 20000) payload = { truncated: true, preview: raw.slice(0, 20000) }
+      A.steps.push({ id: uid(), company_id: cid, run_id: r.id, seq: body.seq, kind: body.kind, name: body.name ?? null, payload, created_at: nowIso() }); return [201, { seq: body.seq }]
+    }
+    if (M('POST', /^\/ai\/runs\/[\w-]+\/finish$/)) {
+      const r = ownRun(seg[3]); if (r.user_id !== uidMe || r.status !== 'running') err(409, 'Only your own running run can be finished')
+      const calls = (body.calls as { input_tokens: number; output_tokens: number }[]) ?? []
+      Object.assign(r, { status: body.status, input_tokens: calls.reduce((a, c) => a + c.input_tokens, 0), output_tokens: calls.reduce((a, c) => a + c.output_tokens, 0),
+        cost_usd: Math.round(calls.reduce((a, c) => a + aiCost(r.model as string, c.input_tokens, c.output_tokens), 0) * 1e6) / 1e6, tool_calls: body.tool_calls ?? 0, error: body.error ?? null, finished_at: nowIso() })
+      audit({ action: 'ai.run_finished', company_id: cid, actor_user_id: uidMe, actor_type: 'agent', entity_type: 'agent_run', entity_id: r.id as string, outcome: r.status === 'completed' ? 'success' : 'failure',
+        details: { agent: r.agent, model: r.model, status: r.status, input_tokens: r.input_tokens, output_tokens: r.output_tokens, cost_usd: r.cost_usd, tool_calls: r.tool_calls } })
+      return [200, runOut(r)]
+    }
+    if (M('GET', '/ai/runs')) return [200, A.runs.filter((r) => r.company_id === cid && (r.user_id === uidMe || (PERMS[ctx.user.role] ?? []).includes('audit:read'))).map(runOut).reverse()]
+    if (M('GET', /^\/ai\/runs\/[\w-]+$/)) { const r = ownRun(seg[3]); return [200, { ...runOut(r), steps: A.steps.filter((x) => x.run_id === r.id).sort((a, b) => Number(a.seq) - Number(b.seq)) }] }
   }
   // ---- operations & dashboard ----
   if (M('GET', '/dashboard/overview')) { need(ctx, 'ops:read'); return [200, overview(ctx)] }

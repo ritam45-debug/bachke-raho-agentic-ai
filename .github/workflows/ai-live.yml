@@ -1,0 +1,33 @@
+# Phase 2 live verification: a real browser on GitHub's runner uses the real Claude API with the
+# ANTHROPIC_API_KEY repository secret. Run it from the Actions tab ("Run workflow"); it also runs when AI code changes.
+# Each run costs a few cents on the key's account.
+name: AI live test
+on:
+  workflow_dispatch:
+    inputs:
+      model: { description: "Model", default: "claude-sonnet-5-5", type: choice, options: [claude-sonnet-5-5, claude-haiku-5-5] }
+  push:
+    branches: [main]
+    paths: ["frontend/src/lib/ai/**", "frontend/src/pages/app/Consulting.tsx", "frontend/e2e/ai-live.mjs", ".github/workflows/ai-live.yml"]
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      LIVE_MODEL: ${{ inputs.model || 'claude-sonnet-5-5' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Serve the built site
+        run: (cd dist-preview && python3 -m http.server 4173 >/dev/null 2>&1 &) && sleep 2
+      - name: Live test with the real Claude API
+        run: node e2e/ai-live.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: ai-live-screenshot, path: frontend/ai-live.png, if-no-files-found: ignore }
