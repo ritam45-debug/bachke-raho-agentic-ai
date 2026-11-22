@@ -13,6 +13,11 @@ const fail = (m) => { summary(`\n**FAILED:** ${m}`); process.exit(1) }
 
 if (!KEY) { summary('## Phase 2 live test: SKIPPED\nThe `ANTHROPIC_API_KEY` repository secret is not set, so the real-Claude test could not run. Phase 2 is **not** verified end-to-end.'); process.exit(78) }
 
+// Safe diagnostics only: never print the key itself.
+const trimmed = KEY.trim()
+summary(`Key check: ${trimmed.length} characters, starts with "sk-ant-": ${trimmed.startsWith('sk-ant-')}, contains whitespace/newlines: ${/\s/.test(KEY)}`)
+if (trimmed.length < 20 || !trimmed.startsWith('sk-ant-')) fail('The ANTHROPIC_API_KEY secret does not look like an Anthropic API key (expected a long value starting with "sk-ant-"). Re-create the secret with the full key.')
+
 const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH, args: ['--no-sandbox'] } : {})
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } })
 const pageErrors = []
@@ -44,7 +49,7 @@ try {
   await page.click("button:has-text('Allow external AI processing')")
   await page.waitForSelector('text=AI is switched off for this company', { state: 'detached' })
   await page.selectOption("select:near(:text('Model'))", MODEL)
-  await page.fill("input[placeholder='sk-ant-…']", KEY)
+  await page.fill("input[placeholder='sk-ant-…']", trimmed)
   await page.click('text=Test & save key')
   await page.waitForSelector('text=(this tab)', { timeout: 30000 }).catch(async () => fail(`Key test failed: ${(await page.locator('main').innerText()).slice(-600)}`))
 
