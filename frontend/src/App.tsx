@@ -4,7 +4,7 @@ import { PREVIEW } from './lib/api'
 import PreviewRibbon from './preview/PreviewRibbon'
 import { AuthProvider, useAuth } from './lib/auth'
 import AppLayout from './components/AppLayout'
-import { Loading, PageHeader, PhasePanel } from './components/ui'
+import { Loading } from './components/ui'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -13,6 +13,10 @@ import { DisruptionsPage, InventoryPage, ShipmentsPage } from './pages/app/DataP
 import VendorsPage from './pages/app/Vendors'
 import FinancePage from './pages/app/Finance'
 import LifecyclePage from './pages/app/Lifecycle'
+import CompliancePage from './pages/app/Compliance'
+import ConsumerPage from './pages/app/Consumer'
+import MemoryPage from './pages/app/Memory'
+import ApprovalsPage from './pages/app/Approvals'
 import SettingsPage from './pages/app/Settings'
 import AuditPage from './pages/app/Audit'
 import RiskMapPage from './pages/app/RiskMap'
@@ -27,11 +31,6 @@ function Protected({ children }: { children: ReactNode }) {
   return me ? <>{children}</> : <Navigate to="/login" replace />
 }
 
-const PLANNED: { path: string; title: string; phase: number; items: string[] }[] = [
-  { path: 'compliance', title: 'Legal & Compliance', phase: 5, items: ['Regulatory update monitoring with sources and effective dates', 'Affected products/shipments and missing documents', 'Facts kept separate from AI interpretation', 'Not a substitute for qualified legal advice'] },
-  { path: 'consumer', title: 'Consumer Intelligence', phase: 5, items: ['Consent-based feedback forms and surveys', 'Sentiment and NPS', 'Recurring complaints and quality issues', 'Feedback linked to batches and shipments'] },
-  { path: 'memory', title: 'Organisational Memory', phase: 5, items: ['Contracts, POs, policies and past decisions', 'Permission-aware document retrieval (pgvector)', 'History pulled in before every major recommendation', 'Admin review, export and deletion'] },
-]
 
 // The artifact frame only passes plain #names, so the preview keeps routes in memory.
 const Router = PREVIEW ? MemoryRouter : BrowserRouter
@@ -58,11 +57,12 @@ export default function App() {
             <Route path="vendors" element={<VendorsPage />} />
             <Route path="products" element={<LifecyclePage />} />
             <Route path="finance" element={<FinancePage />} />
+            <Route path="compliance" element={<CompliancePage />} />
+            <Route path="consumer" element={<ConsumerPage />} />
+            <Route path="memory" element={<MemoryPage />} />
+            <Route path="approvals" element={<ApprovalsPage />} />
             <Route path="audit" element={<AuditPage />} />
             <Route path="settings" element={<SettingsPage />} />
-            {PLANNED.map((p) => (
-              <Route key={p.path} path={p.path} element={<><PageHeader title={p.title} /><PhasePanel phase={p.phase} title={p.title} items={p.items} /></>} />
-            ))}
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

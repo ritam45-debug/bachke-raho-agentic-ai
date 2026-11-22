@@ -19,6 +19,9 @@ class Perm(str, Enum):
     AUDIT_READ = "audit:read"
     APPROVE_HIGH_IMPACT = "approvals:high_impact"  # Phase 6
     AI_USE = "ai:use"                      # chat with agents (Phase 2)
+    COMPLIANCE_WRITE = "compliance:write"  # compliance register (Phase 5)
+    FEEDBACK_WRITE = "feedback:write"      # consumer surveys and responses (Phase 5)
+    MEMORY_WRITE = "memory:write"          # organisational memory (Phase 5)
     PLATFORM_ADMIN = "platform:admin"
 
 
@@ -28,12 +31,14 @@ ROLE_PERMISSIONS: dict[Role, set[Perm]] = {
     Role.SUPER_ADMIN: {Perm.PLATFORM_ADMIN},
     Role.COMPANY_ADMIN: _ALL_TENANT,
     Role.SUPPLY_CHAIN_MANAGER: {Perm.COMPANY_READ, Perm.USERS_READ, Perm.OPS_READ, Perm.OPS_WRITE,
-                                Perm.FINANCE_READ, Perm.APPROVE_HIGH_IMPACT, Perm.AI_USE},
+                                Perm.FINANCE_READ, Perm.APPROVE_HIGH_IMPACT, Perm.AI_USE,
+                                Perm.COMPLIANCE_WRITE, Perm.FEEDBACK_WRITE, Perm.MEMORY_WRITE},
     Role.PROCUREMENT_MANAGER: {Perm.COMPANY_READ, Perm.USERS_READ, Perm.OPS_READ, Perm.PROCUREMENT_WRITE,
-                               Perm.FINANCE_READ, Perm.APPROVE_HIGH_IMPACT, Perm.AI_USE},
+                               Perm.FINANCE_READ, Perm.APPROVE_HIGH_IMPACT, Perm.AI_USE,
+                               Perm.COMPLIANCE_WRITE, Perm.MEMORY_WRITE},
     Role.FINANCE_MANAGER: {Perm.COMPANY_READ, Perm.USERS_READ, Perm.OPS_READ, Perm.FINANCE_READ, Perm.FINANCE_WRITE,
-                           Perm.APPROVE_HIGH_IMPACT, Perm.AI_USE},
-    Role.ANALYST: {Perm.COMPANY_READ, Perm.OPS_READ, Perm.FINANCE_READ, Perm.AI_USE},
+                           Perm.APPROVE_HIGH_IMPACT, Perm.AI_USE, Perm.MEMORY_WRITE},
+    Role.ANALYST: {Perm.COMPANY_READ, Perm.OPS_READ, Perm.FINANCE_READ, Perm.AI_USE, Perm.MEMORY_WRITE},
     Role.READ_ONLY: {Perm.COMPANY_READ, Perm.OPS_READ},
 }
 

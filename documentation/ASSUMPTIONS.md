@@ -19,3 +19,10 @@ Change any of these and the code or docs will follow.
 - **Allocation** is a rule-based heuristic (primary share to rank 1, remainder to rank 2, capped by capacity, MOQ respected, shortfall passed down the ranking). It is not a linear-programming optimum; the brief's LP is deferred because no solver runs in the static build.
 - **Holding cost** default carrying rate 20%/year is a planning convention, not a measured figure for any company. Replace it in Financial Intelligence → assumptions.
 - **Disruption impact** = days × revenue/day × margin + days × downtime/day + expediting + penalties. **Expected loss** = likelihood × impact; likelihood is the user's own judgement, never a model output.
+
+## Phase 5–6 rules
+- **NPS** follows the standard definition: % of 9–10 scores minus % of 0–6 scores. Under 30 responses the UI warns that figures are indicative.
+- **Sentiment and themes** use a small keyword lexicon with simple negation handling (`frontend/src/lib/feedback.ts`). They can misread sarcasm or unusual phrasing; they are a triage aid, not a measurement.
+- **Consent:** a feedback response is stored only if `consent` is true for that row; a batch with any non-consented row is rejected whole. The default consent text is a starting point, not legal wording.
+- **Compliance flags** are reminders (not assessed, no owner, review overdue, effective within 90 days, compliant without evidence). The platform does not monitor law changes and gives no legal advice.
+- **Approvals** never execute anything. A request is decided by someone holding `approvals:high_impact` who is not the requester; this is enforced in the API and by a database check constraint.

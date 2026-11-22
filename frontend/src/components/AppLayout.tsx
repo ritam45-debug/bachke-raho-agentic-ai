@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Activity, Bot, Boxes, BrainCircuit, Building2, ClipboardList, CloudSun, Gauge, Globe2, IndianRupee, LogOut, Map,
-  Menu, Moon, PackageSearch, Route, Scale, Ship, Smile, Sun, Truck, Upload, X,
+  Menu, Moon, PackageSearch, Route, Scale, ShieldCheck, Ship, Smile, Sun, Truck, Upload, X,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { titleCase } from '../lib/format'
 import { Logo } from './ui'
+import NotificationBell from './NotificationBell'
 
 export const SECTIONS = [
   { to: '/app', label: 'Executive Overview', icon: Gauge, end: true },
@@ -19,9 +20,10 @@ export const SECTIONS = [
   { to: '/app/vendors', label: 'Vendor Performance', icon: Truck },
   { to: '/app/products', label: 'Product Lifecycle', icon: PackageSearch },
   { to: '/app/finance', label: 'Financial Intelligence', icon: IndianRupee, perm: 'finance:read' },
-  { to: '/app/compliance', label: 'Legal & Compliance', icon: Scale, phase: 5 },
-  { to: '/app/consumer', label: 'Consumer Intelligence', icon: Smile, phase: 5 },
-  { to: '/app/memory', label: 'Organisational Memory', icon: BrainCircuit, phase: 5 },
+  { to: '/app/compliance', label: 'Legal & Compliance', icon: Scale },
+  { to: '/app/consumer', label: 'Consumer Intelligence', icon: Smile },
+  { to: '/app/memory', label: 'Organisational Memory', icon: BrainCircuit },
+  { to: '/app/approvals', label: 'Approvals', icon: ShieldCheck },
   { to: '/app/consulting', label: 'AI Consulting Centre', icon: Bot, perm: 'ai:use' },
   { to: '/app/import', label: 'Data Import', icon: Upload, anyPerm: ['ops:write', 'procurement:write'] },
   { to: '/app/audit', label: 'Audit & Activity', icon: ClipboardList, perm: 'audit:read' },
@@ -62,12 +64,11 @@ export default function AppLayout() {
             ? 'bg-ink-900 font-semibold text-white dark:bg-ink-800' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-ink-800/60'}`}>
           <s.icon size={17} className="shrink-0" />
           <span className="flex-1 truncate">{s.label}</span>
-          {s.phase && <span className="rounded bg-slate-200 px-1.5 text-[10px] font-semibold text-slate-600 dark:bg-ink-700 dark:text-slate-300">P{s.phase}</span>}
         </NavLink>
       ))}
       <div className="mt-auto rounded-lg border border-slate-200 p-3 text-xs dark:border-ink-700">
         <div className="flex items-center gap-1.5 font-semibold"><Activity size={13} className="text-calm" /> Agent layer</div>
-        <p className="mt-1 text-slate-500 dark:text-slate-400">Route Risk Analyst available in the AI Consulting Centre. Live checks use public weather and hazard feeds.</p>
+        <p className="mt-1 text-slate-500 dark:text-slate-400">Route Risk Analyst in the AI Consulting Centre. High-impact actions go to Approvals for a human decision.</p>
       </div>
     </nav>
   )
@@ -91,6 +92,7 @@ export default function AppLayout() {
             <div className="truncate text-sm font-semibold">{me?.company_name}</div>
             <div className="truncate text-xs text-slate-500 dark:text-slate-400">{me?.full_name} · {titleCase(me?.role ?? '')}</div>
           </div>
+          <NotificationBell />
           <ThemeToggle />
           <button onClick={() => { nav('/'); void logout() }} className="btn-ghost !px-3" title="Sign out"><LogOut size={16} /><span className="hidden sm:inline">Sign out</span></button>
         </header>

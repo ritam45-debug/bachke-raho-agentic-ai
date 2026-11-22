@@ -2,11 +2,15 @@
 
 **Predict. Prevent. Protect.** An enterprise multi-agent supply-chain intelligence platform.
 
-> **Status: Phase 1 complete, plus the live Route & Risk Map and Weather Forecast tools.** Multi-company registration,
-> secure auth, role-based access, two-layer tenant isolation (app + PostgreSQL RLS), audit trail, an executive dashboard,
-> and live route risk checks from public weather, sea-state, earthquake and natural-event data.
-> **Phase 2:** the AI Consulting Centre with the Route Risk Analyst agent (bring-your-own Anthropic key). See
-> [documentation/AI.md](documentation/AI.md), [ROADMAP.md](documentation/ROADMAP.md) and [LIVE_DATA.md](documentation/LIVE_DATA.md).
+> **Status: Phases 1–6 built and tested; Phase 7 (production hardening and hosting) not started.**
+> - **1:** multi-company registration, secure auth, 7 roles, two-layer tenant isolation (app + PostgreSQL RLS), audit trail, live Route & Risk Map and Weather Forecast from public data.
+> - **2:** AI Consulting Centre with the Route Risk Analyst (bring-your-own Anthropic key; live test with a real key still pending).
+> - **3:** CSV import for suppliers, products, inventory and shipments; Logistics Analytics.
+> - **4:** weighted vendor scoring and allocation, Financial Intelligence, Product Lifecycle (BOM cost build-up).
+> - **5:** Legal & Compliance register, Consumer Intelligence (consented surveys, NPS, themes), Organisational Memory.
+> - **6:** approval workflow for high-impact actions (no self-approval) with in-app notifications.
+>
+> What each phase does **not** include is listed in [ROADMAP.md](documentation/ROADMAP.md). See also [AI.md](documentation/AI.md), [LIVE_DATA.md](documentation/LIVE_DATA.md) and [ASSUMPTIONS.md](documentation/ASSUMPTIONS.md).
 
 **Live preview:** https://ritam45-debug.github.io/bachke-raho-agentic-ai/
 

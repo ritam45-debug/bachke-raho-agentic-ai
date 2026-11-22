@@ -8,18 +8,18 @@ interface Loc { id: string; company_id: string; name: string; kind: string; city
 interface User { id: string; company_id: string; email: string; full_name: string; job_title: string | null; role: string; pw: string; salt: string; is_active: boolean; failed: number; locked_until: number | null; last_login_at: string | null; created_at: string }
 interface Session { id: string; user_id: string; access: string; refresh: string; access_exp: number; refresh_exp: number; revoked: boolean }
 interface Audit { id: string; company_id: string | null; actor_user_id: string | null; actor_type: string; action: string; entity_type: string | null; entity_id: string | null; outcome: string; ip_address: string | null; details: Rec; created_at: string }
-interface State { v: 2; companies: Company[]; profiles: Profile[]; locations: Loc[]; users: User[]; sessions: Session[]; audit: Audit[]; ops: Record<string, Rec[]>; routes: Rec[]; checks: Rec[]; p4?: { weights: Rec; finance: Rec; scenarios: Rec[]; bom: Rec[] }; ai?: { convs: Rec[]; msgs: Rec[]; runs: Rec[]; steps: Rec[] } }
+interface State { v: 2; companies: Company[]; profiles: Profile[]; locations: Loc[]; users: User[]; sessions: Session[]; audit: Audit[]; ops: Record<string, Rec[]>; routes: Rec[]; checks: Rec[]; p4?: { weights: Rec; finance: Rec; scenarios: Rec[]; bom: Rec[] }; p5?: { comp: Rec[]; surveys: Rec[]; resp: Rec[]; mem: Rec[]; appr: Rec[]; notif: Rec[] }; ai?: { convs: Rec[]; msgs: Rec[]; runs: Rec[]; steps: Rec[] } }
 
 const KEY = 'bra.preview.state.v2' // v1 held the removed Aureon demo
 const ACCESS_MS = 30 * 60e3, REFRESH_MS = 7 * 864e5, MAX_FAIL = 5, LOCK_MS = 15 * 60e3
 const ROLES = ['company_admin', 'supply_chain_manager', 'procurement_manager', 'finance_manager', 'analyst', 'read_only']
-const ALL = ['company:read', 'company:update', 'users:read', 'users:manage', 'ops:read', 'ops:write', 'procurement:write', 'finance:read', 'finance:write', 'audit:read', 'approvals:high_impact', 'ai:use']
+const ALL = ['company:read', 'company:update', 'users:read', 'users:manage', 'ops:read', 'ops:write', 'procurement:write', 'finance:read', 'finance:write', 'audit:read', 'approvals:high_impact', 'ai:use', 'compliance:write', 'feedback:write', 'memory:write']
 const PERMS: Record<string, string[]> = {
   company_admin: ALL,
-  supply_chain_manager: ['company:read', 'users:read', 'ops:read', 'ops:write', 'finance:read', 'approvals:high_impact', 'ai:use'],
-  procurement_manager: ['company:read', 'users:read', 'ops:read', 'procurement:write', 'finance:read', 'approvals:high_impact', 'ai:use'],
-  finance_manager: ['company:read', 'users:read', 'ops:read', 'finance:read', 'finance:write', 'approvals:high_impact', 'ai:use'],
-  analyst: ['company:read', 'ops:read', 'finance:read', 'ai:use'],
+  supply_chain_manager: ['company:read', 'users:read', 'ops:read', 'ops:write', 'finance:read', 'approvals:high_impact', 'ai:use', 'compliance:write', 'feedback:write', 'memory:write'],
+  procurement_manager: ['company:read', 'users:read', 'ops:read', 'procurement:write', 'finance:read', 'approvals:high_impact', 'ai:use', 'compliance:write', 'memory:write'],
+  finance_manager: ['company:read', 'users:read', 'ops:read', 'finance:read', 'finance:write', 'approvals:high_impact', 'ai:use', 'memory:write'],
+  analyst: ['company:read', 'ops:read', 'finance:read', 'ai:use', 'memory:write'],
   read_only: ['company:read', 'ops:read'],
 }
 
@@ -509,6 +509,111 @@ async function route(method: string, path: string, q: URLSearchParams, body: Rec
     }
     if (M('GET', '/ai/runs')) return [200, A.runs.filter((r) => r.company_id === cid && (r.user_id === uidMe || (PERMS[ctx.user.role] ?? []).includes('audit:read'))).map(runOut).reverse()]
     if (M('GET', /^\/ai\/runs\/[\w-]+$/)) { const r = ownRun(seg[3]); return [200, { ...runOut(r), steps: A.steps.filter((x) => x.run_id === r.id).sort((a, b) => Number(a.seq) - Number(b.seq)) }] }
+  }
+  // ---- Phases 5 & 6 (mirror backend/app/api/phase5.py) ----
+  if (/^\/(compliance|feedback|memory|approvals|notifications)/.test(path)) {
+    const cid = ctx.company!.id, me = ctx.user.id, perms = PERMS[ctx.user.role] ?? [], has = (...p: string[]) => p.some((x) => perms.includes(x))
+    const P = (S.p5 ??= { comp: [], surveys: [], resp: [], mem: [], appr: [], notif: [] }) as { comp: Rec[]; surveys: Rec[]; resp: Rec[]; mem: Rec[]; appr: Rec[]; notif: Rec[] }
+    const seg = path.split('/'), id = seg[2]
+    const own = (arr: Rec[], x: unknown, what = 'Not found') => { const r = arr.find((o) => o.id === x && o.company_id === cid); if (!r) err(404, what); return r! }
+    const log = (action: string, entity_type: string | null = null, entity_id: string | null = null, details: Rec = {}) => audit({ action, company_id: cid, actor_user_id: me, entity_type, entity_id, details })
+    const users = S.users.filter((u) => u.company_id === cid), names = Object.fromEntries(users.map((u) => [u.id, u.full_name]))
+    const today = new Date().toISOString().slice(0, 10), soon = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10)
+    const isDate = (v: unknown) => v == null || v === '' || /^\d{4}-\d{2}-\d{2}$/.test(String(v))
+    const flags = (c: Rec) => { if (c.status === 'not_applicable') return []; const f: string[] = []
+      if (c.status === 'gap') f.push('Gap recorded'); if (c.status === 'not_assessed') f.push('Not yet assessed'); if (!c.owner_user_id) f.push('No owner')
+      if (c.review_date && String(c.review_date) < today) f.push('Review overdue')
+      if (c.effective_date && String(c.effective_date) >= today && String(c.effective_date) <= soon && c.status !== 'compliant') f.push('Takes effect within 90 days')
+      if (c.status === 'compliant' && !c.evidence) f.push('Compliant but no evidence noted'); return f }
+    const compIn = () => {
+      only(body, ['title', 'jurisdiction', 'category', 'regulator', 'source_url', 'effective_date', 'review_date', 'status', 'owner_user_id', 'applies_to', 'obligation', 'interpretation', 'evidence'])
+      const url = str(body, 'source_url', 1, 500)!; if (!/^https?:\/\/[^\s/]+\.[^\s]+/.test(url)) v422('source_url', 'Input should be a valid URL')
+      for (const k of ['effective_date', 'review_date']) if (!isDate(body[k])) v422(k, 'Input should be a valid date')
+      const st = (body.status as string) ?? 'not_assessed'; if (!['not_assessed', 'compliant', 'in_progress', 'gap', 'not_applicable'].includes(st)) v422('status', 'invalid status')
+      if (body.owner_user_id && !users.some((u) => u.id === body.owner_user_id)) err(422, 'Owner must be a user in your company')
+      return { title: str(body, 'title', 3, 240), jurisdiction: str(body, 'jurisdiction', 2, 120), category: str(body, 'category', 2, 80), regulator: str(body, 'regulator', 0, 160, false),
+        source_url: url, effective_date: body.effective_date || null, review_date: body.review_date || null, status: st, owner_user_id: body.owner_user_id || null,
+        applies_to: str(body, 'applies_to', 0, 240, false), obligation: str(body, 'obligation', 0, 8000, false), interpretation: str(body, 'interpretation', 0, 8000, false), evidence: str(body, 'evidence', 0, 8000, false) } }
+    const compOut = (c: Rec) => ({ ...c, flags: flags(c) })
+    if (M('GET', '/compliance')) { need(ctx, 'ops:read'); return [200, P.comp.filter((c) => c.company_id === cid).sort((a, b) => `${a.jurisdiction}${a.title}`.localeCompare(`${b.jurisdiction}${b.title}`)).map(compOut)] }
+    if (M('POST', '/compliance')) { need(ctx, 'compliance:write'); const c = { id: uid(), company_id: cid, ...compIn(), created_by: me, created_at: nowIso(), updated_at: nowIso() }; P.comp.push(c); log('compliance.created', 'compliance_requirement', c.id, { title: c.title }); return [201, compOut(c)] }
+    if (M('PUT', /^\/compliance\/[\w-]+$/)) { need(ctx, 'compliance:write'); const c = own(P.comp, id); const before = c.status; Object.assign(c, compIn(), { updated_at: nowIso() }); log('compliance.updated', 'compliance_requirement', id, { status_from: before, status_to: c.status }); return [200, compOut(c)] }
+    if (M('DELETE', /^\/compliance\/[\w-]+$/)) { need(ctx, 'compliance:write'); const c = own(P.comp, id); P.comp = P.comp.filter((x) => x !== c); log('compliance.deleted', 'compliance_requirement', id); return [204, null] }
+
+    const respOut = (r: Rec) => { const { consent: _c, company_id: _x, ...rest } = r; void _c; void _x; return rest }
+    if (M('GET', '/feedback/surveys')) { need(ctx, 'ops:read'); return [200, P.surveys.filter((x) => x.company_id === cid).map((x) => ({ ...x, responses: P.resp.filter((r) => r.survey_id === x.id).length })).reverse()] }
+    if (M('POST', '/feedback/surveys')) { need(ctx, 'feedback:write'); only(body, ['title', 'question', 'consent_text', 'is_open'])
+      const sv = { id: uid(), company_id: cid, title: str(body, 'title', 3, 200), question: str(body, 'question', 5, 300, false) ?? 'How likely are you to recommend us to a friend or colleague?', consent_text: str(body, 'consent_text', 20, 4000), is_open: body.is_open !== false, created_by: me, created_at: nowIso() }
+      P.surveys.push(sv); log('survey.created', 'feedback_survey', sv.id, { title: sv.title }); return [201, { ...sv, responses: 0 }] }
+    if (M('PATCH', /^\/feedback\/surveys\/[\w-]+$/)) { need(ctx, 'feedback:write'); const sv = own(P.surveys, seg[3]); sv.is_open = q.get('is_open') === 'true'; log(sv.is_open ? 'survey.opened' : 'survey.closed', 'feedback_survey', sv.id as string); return [200, sv] }
+    if (M('DELETE', /^\/feedback\/surveys\/[\w-]+$/)) { need(ctx, 'feedback:write'); const sv = own(P.surveys, seg[3]); P.surveys = P.surveys.filter((x) => x !== sv); P.resp = P.resp.filter((r) => r.survey_id !== sv.id); log('survey.deleted', 'feedback_survey', sv.id as string); return [204, null] }
+    if (M('GET', /^\/feedback\/surveys\/[\w-]+\/responses$/)) { need(ctx, 'ops:read'); own(P.surveys, seg[3]); return [200, P.resp.filter((r) => r.survey_id === seg[3] && r.company_id === cid).map(respOut).reverse()] }
+    if (M('POST', /^\/feedback\/surveys\/[\w-]+\/responses$/)) {
+      need(ctx, 'feedback:write'); const sv = own(P.surveys, seg[3]); if (!sv.is_open) err(409, 'This survey is closed')
+      const rows = (body.rows as Rec[]) ?? []; if (!rows.length || rows.length > 5000) v422('rows', 'Provide 1–5000 rows')
+      rows.forEach((r, i) => { const sc = Number(r.score); if (!Number.isInteger(sc) || sc < 0 || sc > 10) err(422, `Row ${i + 1}: score must be a whole number 0–10`) })
+      const bad = rows.map((r, i) => (r.consent === true ? 0 : i + 1)).filter(Boolean)
+      if (bad.length) err(422, `Row(s) ${bad.slice(0, 20).join(', ')}: consent is not true. Responses without consent cannot be stored.`)
+      for (const r of rows) P.resp.push({ id: uid(), company_id: cid, survey_id: sv.id, score: Number(r.score), comment: (r.comment as string) || null, channel: (r.channel as string) || null, product_sku: (r.product_sku as string) || null, region: (r.region as string) || null, consent: true, received_at: nowIso() })
+      log('feedback.recorded', 'feedback_survey', sv.id as string, { count: rows.length }); return [200, { created: rows.length }]
+    }
+    if (M('DELETE', /^\/feedback\/responses\/[\w-]+$/)) { need(ctx, 'feedback:write'); const r = own(P.resp, seg[3]); P.resp = P.resp.filter((x) => x !== r); log('feedback.deleted', 'feedback_response', seg[3]); return [204, null] }
+
+    const memOut = (m: Rec) => { const { company_id: _x, ...rest } = m; void _x; return rest }
+    if (M('GET', '/memory/export')) { need(ctx, 'company:update'); const rows = P.mem.filter((m) => m.company_id === cid).map(memOut); log('memory.exported', null, null, { count: rows.length }); return [200, { company_id: cid, exported_at: nowIso(), entries: rows }] }
+    if (M('GET', '/memory')) {
+      need(ctx, 'ops:read'); let rows = P.mem.filter((m) => m.company_id === cid).slice().reverse()
+      const kind = q.get('kind'), tag = q.get('tag')?.toLowerCase(), words = (q.get('q') ?? '').toLowerCase().split(/\s+/).filter(Boolean)
+      if (kind) rows = rows.filter((m) => m.kind === kind)
+      if (words.length) rows = rows.filter((m) => { const hay = `${m.title} ${m.body} ${(m.tags as string[]).join(' ')} ${m.related ?? ''}`.toLowerCase(); return words.every((w) => hay.includes(w)) })
+      if (tag) rows = rows.filter((m) => (m.tags as string[]).includes(tag))
+      return [200, rows.slice(0, 500).map(memOut)]
+    }
+    if (M('POST', '/memory')) {
+      need(ctx, 'memory:write'); only(body, ['title', 'body', 'kind', 'tags', 'related'])
+      if (!['lesson', 'decision', 'incident', 'playbook', 'note'].includes(body.kind as string)) v422('kind', 'invalid kind')
+      const tags = [...new Set(((body.tags as string[]) ?? []).map((t) => String(t).trim().toLowerCase().slice(0, 40)).filter(Boolean))].sort()
+      const m = { id: uid(), company_id: cid, title: str(body, 'title', 3, 200), body: str(body, 'body', 3, 20000), kind: body.kind, tags, related: str(body, 'related', 0, 200, false), created_by: me, created_at: nowIso() }
+      P.mem.push(m); log('memory.created', 'memory_entry', m.id, { title: m.title, kind: m.kind }); return [201, memOut(m)]
+    }
+    if (M('DELETE', /^\/memory\/[\w-]+$/)) { need(ctx, 'memory:write'); const m = own(P.mem, id); if (m.created_by !== me && !has('company:update')) err(403, 'Only the author or a company admin can delete this entry'); P.mem = P.mem.filter((x) => x !== m); log('memory.deleted', 'memory_entry', id); return [204, null] }
+
+    const apOut = (a: Rec) => ({ ...a, requested_by_name: names[a.requested_by as string] ?? null, decided_by_name: names[a.decided_by as string] ?? null })
+    const notify = (ids: string[], title: string, b: string | null, link = '/app/approvals') => { for (const u of new Set(ids)) P.notif.push({ id: uid(), company_id: cid, user_id: u, title, body: b, link, read_at: null, created_at: nowIso() }) }
+    if (M('GET', '/approvals')) { need(ctx, 'ops:read'); const st = q.get('status'); return [200, P.appr.filter((a) => a.company_id === cid && (!st || a.status === st)).slice().reverse().map(apOut)] }
+    if (M('POST', '/approvals')) {
+      if (!has('ops:write', 'procurement:write', 'finance:write')) err(403, 'Missing permission: ops:write or procurement:write or finance:write')
+      only(body, ['title', 'action_type', 'details', 'justification', 'estimated_cost', 'source', 'source_ref'])
+      if (!['expedite_shipment', 'switch_supplier', 'reroute', 'safety_stock_change', 'spend', 'other'].includes(body.action_type as string)) v422('action_type', 'invalid action type')
+      const src = (body.source as string) ?? 'manual'; if (!['manual', 'route_risk', 'ai_agent', 'vendor_scoring', 'finance'].includes(src)) v422('source', 'invalid source')
+      const cost = body.estimated_cost == null || body.estimated_cost === '' ? null : Number(body.estimated_cost); if (cost != null && !(cost >= 0)) v422('estimated_cost', 'must be ≥ 0')
+      const a = { id: uid(), company_id: cid, title: str(body, 'title', 3, 200), action_type: body.action_type, details: str(body, 'details', 5, 8000), justification: str(body, 'justification', 0, 8000, false), estimated_cost: cost,
+        source: src, source_ref: str(body, 'source_ref', 0, 200, false), status: 'pending', requested_by: me, decided_by: null, decided_at: null, decision_note: null, outcome: null, outcome_at: null, created_at: nowIso() }
+      P.appr.push(a)
+      const approvers = users.filter((u) => u.is_active && u.id !== me && (PERMS[u.role] ?? []).includes('approvals:high_impact')).map((u) => u.id)
+      notify(approvers, `Approval needed: ${a.title}`, `${ctx.user.full_name} requested ${String(a.action_type).replace(/_/g, ' ')}.`)
+      log('approval.requested', 'approval_request', a.id, { title: a.title, action_type: a.action_type, estimated_cost: cost, notified: approvers.length }); return [201, apOut(a)]
+    }
+    if (M('POST', /^\/approvals\/[\w-]+\/decision$/)) {
+      need(ctx, 'approvals:high_impact'); const a = own(P.appr, id)
+      if (a.status !== 'pending') err(409, `Request is already ${a.status}`)
+      if (a.requested_by === me) err(403, 'You cannot approve or reject your own request')
+      if (!['approved', 'rejected'].includes(body.decision as string)) v422('decision', 'invalid decision')
+      const note = str(body, 'note', 0, 4000, false); if (body.decision === 'rejected' && !note) err(422, 'Give a reason when rejecting')
+      Object.assign(a, { status: body.decision, decided_by: me, decided_at: nowIso(), decision_note: note })
+      if (a.requested_by) notify([a.requested_by as string], `${body.decision === 'approved' ? 'Approved' : 'Rejected'}: ${a.title}`, note)
+      log(`approval.${body.decision}`, 'approval_request', id, { title: a.title }); return [200, apOut(a)]
+    }
+    if (M('POST', /^\/approvals\/[\w-]+\/cancel$/)) { const a = own(P.appr, id); if (a.requested_by !== me) err(403, 'Only the requester can cancel'); if (a.status !== 'pending') err(409, `Request is already ${a.status}`); a.status = 'cancelled'; log('approval.cancelled', 'approval_request', id); return [200, apOut(a)] }
+    if (M('POST', /^\/approvals\/[\w-]+\/outcome$/)) {
+      const a = own(P.appr, id); if (a.status !== 'approved') err(409, 'Outcomes can only be recorded for approved requests')
+      if (![a.requested_by, a.decided_by].includes(me) && !has('approvals:high_impact')) err(403, 'Only the requester or an approver can record the outcome')
+      Object.assign(a, { outcome: str(body, 'outcome', 3, 8000), outcome_at: nowIso() }); log('approval.outcome_recorded', 'approval_request', id); return [200, apOut(a)]
+    }
+    const mineN = P.notif.filter((n) => n.company_id === cid && n.user_id === me)
+    if (M('GET', '/notifications')) { const items = mineN.slice().reverse().slice(0, 50).map(({ company_id: _c, user_id: _u, ...r }) => { void _c; void _u; return r }); return [200, { unread: items.filter((n) => !n.read_at).length, items }] }
+    if (M('POST', '/notifications/read-all')) { for (const n of mineN) n.read_at ??= nowIso(); return [200, { unread: 0 }] }
+    if (M('POST', /^\/notifications\/[\w-]+\/read$/)) { const n = mineN.find((x) => x.id === id); if (!n) err(404, 'Not found'); n!.read_at ??= nowIso(); return [200, n] }
   }
   // ---- Phase 4 (mirrors backend/app/api/phase4.py) ----
   if (/^\/(vendor-scoring|finance|bom)/.test(path)) {

@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import ai, audit_admin, auth, company, dashboard, data_import, operations, phase4, routes_api, users
+from app.api import ai, audit_admin, auth, company, dashboard, data_import, operations, phase4, phase5, routes_api, users
 from app.core.config import get_settings
 from app.database.session import init_db
 
@@ -68,6 +68,6 @@ def health():
 
 
 ROUTERS = (auth.router, company.router, users.router, dashboard.router, operations.router, routes_api.router, ai.router,
-           phase4.router, data_import.router, audit_admin.router)
+           phase4.router, phase5.router, data_import.router, audit_admin.router)
 for r in ROUTERS:
     app.include_router(r, prefix=settings.api_prefix)

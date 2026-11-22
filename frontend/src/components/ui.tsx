@@ -38,6 +38,8 @@ const STATUS_TONE: Record<string, string> = {
   delayed: 'red', in_transit: 'blue', planned: 'slate', delivered: 'green', cancelled: 'slate',
   active: 'red', monitoring: 'amber', resolved: 'green', simulated: 'violet', verified: 'green', unverified: 'amber',
   success: 'green', failure: 'red', denied: 'amber',
+  compliant: 'green', gap: 'red', in_progress: 'blue', not_assessed: 'amber', not_applicable: 'slate', pending: 'amber', approved: 'green', rejected: 'red',
+  positive: 'green', negative: 'red', neutral: 'slate',
 }
 
 export function Badge({ value, tone }: { value: string; tone?: string }) {

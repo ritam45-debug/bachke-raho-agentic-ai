@@ -11,6 +11,7 @@ import LiveMap, { BAND_COLOR, MapLegend, type Layers } from '../../components/Li
 import PlaceSearch from '../../components/PlaceSearch'
 import CsvImport from '../../components/CsvImport'
 import { Badge, ErrorBox, PageHeader } from '../../components/ui'
+import RequestApproval from '../../components/RequestApproval'
 
 export interface Loc { id: string; name: string; kind: string; city: string | null; country: string | null; latitude: number | null; longitude: number | null }
 interface Check { id: string; score: number; band: string; factors: Factor[]; sources: SourceStatus[]; checked_at: string; forecast_days: number }
@@ -270,6 +271,10 @@ export default function RiskMapPage() {
                     ))}</ul>
                   ) : <p className="text-sm text-emerald-600 dark:text-emerald-400">No hazards above thresholds along this route in the next {sel.latest_check.forecast_days} days.</p>}
                   <div className="flex flex-wrap gap-1.5">{sel.latest_check.sources.map((s) => <Badge key={s.name} value={`${s.name}: ${s.status}`} tone={s.status === 'ok' ? 'green' : 'amber'} />)}</div>
+                  {(sel.latest_check.band === 'elevated' || sel.latest_check.band === 'high') && (
+                    <RequestApproval key={sel.latest_check.id} compact source="route_risk" sourceRef={sel.name} title={`Mitigate ${titleCase(sel.latest_check.band)} risk on ${sel.name}`}
+                      details={`Route risk score ${sel.latest_check.score} (${sel.latest_check.band}, rule-based, not a probability) at ${dateTime(sel.latest_check.checked_at)}.\n${sel.latest_check.factors.map((f) => `• ${f.name}: ${f.detail} (${f.source})`).join('\n')}\nProposed action: `} />
+                  )}
                 </>
               ) : <p className="text-sm text-slate-500">Not checked yet.</p>}
               {history && history.length > 1 && (

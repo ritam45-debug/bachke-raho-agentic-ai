@@ -73,7 +73,7 @@ export function InventoryPage() {
 export function ShipmentsPage() {
   return <DataPage path="/shipments" title="Shipment Tracking" file="shipments.csv" filterKey="status" filterLabel="statuses"
     search={['reference', 'supplier', 'product', 'origin', 'destination', 'carrier']}
-    subtitle="Shipment records as held in this workspace. Live carrier tracking needs a connected tracking API (Phase 3); no positions are invented."
+    subtitle="Shipment records as held in this workspace. Live carrier tracking needs a paid tracking API, which is not connected; no positions are invented. Update status and ETAs by re-importing."
     cols={[
       { key: 'reference', label: 'Ref', render: (r) => <span className="num text-xs">{String(r.reference)}</span> },
       { key: 'direction', label: 'Dir', render: (r) => titleCase(String(r.direction)) },
@@ -90,7 +90,7 @@ export function ShipmentsPage() {
 export function VendorsPage() {
   return <DataPage path="/suppliers" title="Vendor Performance" file="suppliers.csv" filterKey="category" filterLabel="categories"
     search={['code', 'name', 'country', 'category']}
-    subtitle="Historical performance as recorded. The configurable weighted vendor-scoring engine (cost 25 / quality 20 / reliability 20 / lead time 15 / financial 10 / risk 10) arrives in Phase 4."
+    subtitle="Historical performance as recorded. Weighted scoring and allocation are on the Scoring & allocation tab."
     cols={[
       { key: 'code', label: 'Code', render: (r) => <span className="num text-xs">{String(r.code)}</span> },
       { key: 'name', label: 'Supplier' }, { key: 'category', label: 'Category' },
@@ -106,7 +106,7 @@ export function VendorsPage() {
 export function DisruptionsPage() {
   return <DataPage path="/disruptions" title="Global Disruptions" file="disruptions.csv" filterKey="status" filterLabel="statuses"
     search={['title', 'category', 'summary']}
-    subtitle="Disruptions relevant to this company. Every record shows whether it is verified, unverified or simulated. Live news, weather and port feeds plus the world map arrive in Phase 3."
+    subtitle="Disruptions relevant to this company. Every record shows whether it is verified, unverified or simulated. Live weather and hazard feeds are on the Route & Risk Map."
     cols={[
       { key: 'severity', label: 'Severity', render: (r) => <SeverityPill score={r.severity as number} /> },
       { key: 'title', label: 'Event', render: (r) => <div><div className="font-medium">{String(r.title)}</div><div className="mt-0.5 max-w-xl text-xs text-slate-500">{String(r.summary ?? '')}</div></div> },
@@ -122,7 +122,7 @@ export function DisruptionsPage() {
 export function ProductsPage() {
   return <DataPage path="/products" title="Product Lifecycle" file="products.csv" filterKey="kind" filterLabel="types"
     search={['sku', 'name', 'category', 'primary_supplier']}
-    subtitle="Product and material catalogue. Stage-by-stage traceability (procurement → production → delivery → returns) arrives in Phase 4."
+    subtitle="Product and material catalogue. Traceability and BOM cost build-up are on the Traceability & cost tab."
     cols={[
       { key: 'sku', label: 'SKU', render: (r) => <span className="num text-xs">{String(r.sku)}</span> },
       { key: 'name', label: 'Name' }, { key: 'kind', label: 'Type', render: (r) => titleCase(String(r.kind)) },

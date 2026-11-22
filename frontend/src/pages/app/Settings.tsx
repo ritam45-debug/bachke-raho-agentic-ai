@@ -122,7 +122,7 @@ function Team({ editable, selfId }: { editable: boolean; selfId: string }) {
           <button className="btn-primary"><UserPlus size={15} />Add</button>
         </form>
       )}
-      {editable && <p className="mt-2 text-xs text-slate-500">Share the temporary password through a separate channel. Email invitations and forced password change arrive with notifications in Phase 6.</p>}
+      {editable && <p className="mt-2 text-xs text-slate-500">Share the temporary password through a separate channel. In-app notifications are live; email invitations need an email provider, which is not connected.</p>}
     </Section>
   )
 }
